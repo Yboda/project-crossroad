@@ -604,12 +604,19 @@ export class ExplorationScene extends Phaser.Scene {
     if (option.type === 'unlock-soul-node') {
       const result = unlockSoulNode(option.nodeId, this.persistentState)
       savePersistentState(this.persistentState)
+      const nextNarrative = createSoulNodeNarrative(this.persistentState)
       this.currentNarrative = {
-        id: `soul-node-result-${option.nodeId}`,
-        title: result.ok ? '기억이 새겨짐' : '각인 실패',
-        story: [result.message],
-        prompt: '당신은,',
-        options: this.createUiOptions([{ id: 'back-soul-nodes', label: '각인 목록으로 돌아간다.', type: 'open-soul-nodes' }]),
+        ...nextNarrative,
+        id: `soul-nodes-${option.nodeId}-${this.persistentState.memoryShards}`,
+        modal: result.ok
+          ? {
+              title: '기억이 새겨짐',
+              story: result.message,
+            }
+          : {
+              title: '각인 실패',
+              story: result.message,
+            },
       }
       this.publishNarrative()
       return

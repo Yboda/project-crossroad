@@ -220,8 +220,7 @@
 .lobby-status-card small,
 .lobby-menu-button small,
 .body-card-copy small,
-.body-card-copy em,
-.soul-node-card small {
+.body-card-copy em {
   display: block;
   color: #d8a657;
   font-size: 11px;
@@ -245,8 +244,7 @@
 
 .lobby-menu-button,
 .lobby-link-button,
-.body-card,
-.soul-node-card {
+.body-card {
   border: 1px solid rgba(216, 166, 87, 0.28);
   color: #fff;
   background: rgba(32, 40, 58, 0.94);
@@ -265,15 +263,13 @@
   background: linear-gradient(135deg, rgba(120, 74, 24, 0.96), rgba(216, 166, 87, 0.62));
 }
 
-.lobby-menu-button:disabled,
-.soul-node-card:disabled {
+.lobby-menu-button:disabled {
   color: #697081;
   border-color: rgba(105, 112, 129, 0.35);
   background: rgba(23, 26, 35, 0.92);
 }
 
-.lobby-menu-button span,
-.soul-node-card span {
+.lobby-menu-button span {
   display: block;
   font-size: 14px;
   font-weight: 800;
@@ -295,8 +291,7 @@
   font-weight: 800;
 }
 
-.body-card-list,
-.soul-node-grid {
+.body-card-list {
   min-height: 0;
   overflow-y: auto;
   display: grid;
@@ -413,14 +408,331 @@
   background: rgba(20, 25, 37, 0.76);
 }
 
-.soul-node-grid {
-  grid-template-columns: 1fr;
+.soul-board {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 176px;
+  gap: 10px;
 }
 
-.soul-node-card {
-  min-height: 62px;
-  padding: 12px;
-  border-radius: 14px;
+.soul-node-map {
+  position: relative;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  border: 1px solid rgba(216, 166, 87, 0.18);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(216, 166, 87, 0.1), rgba(216, 166, 87, 0) 44%),
+    rgba(7, 10, 16, 0.72);
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+.soul-node-canvas {
+  width: 920px;
+  height: 520px;
+}
+
+.soul-node-canvas-inner {
+  position: relative;
+  width: 920px;
+  height: 520px;
+}
+
+.soul-node-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.soul-node-links line {
+  stroke: rgba(105, 112, 129, 0.58);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.soul-node-links line.is-active {
+  stroke: rgba(255, 209, 102, 0.82);
+  stroke-width: 2;
+}
+
+.soul-hex-node {
+  position: relative;
+  position: absolute;
+  left: var(--node-x);
+  top: var(--node-y);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  width: 96px;
+  height: 84px;
+  padding: 14px 12px;
+  border: 0;
+  color: #f7efe0;
+  background: rgba(32, 40, 58, 0.96);
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+  font: inherit;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.soul-hex-node::before {
+  position: absolute;
+  inset: 3px;
+  content: '';
+  border: 1px solid rgba(216, 166, 87, 0.34);
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+  pointer-events: none;
+}
+
+.soul-hex-node.is-selected {
+  background: rgba(78, 58, 31, 0.98);
+  box-shadow: 0 0 24px rgba(216, 166, 87, 0.18);
+}
+
+.soul-hex-node.is-selected::before {
+  border-color: rgba(255, 209, 102, 0.9);
+}
+
+.soul-hex-node.is-unlocked {
+  background: rgba(41, 78, 56, 0.98);
+}
+
+.soul-hex-node.route-attack:not(.is-locked) {
+  background: rgba(72, 42, 38, 0.98);
+}
+
+.soul-hex-node.route-defense:not(.is-locked) {
+  background: rgba(33, 54, 76, 0.98);
+}
+
+.soul-hex-node.route-life:not(.is-locked) {
+  background: rgba(38, 70, 48, 0.98);
+}
+
+.soul-hex-node.is-locked {
+  color: #7b8292;
+  background: rgba(23, 26, 35, 0.96);
+}
+
+.soul-hex-node.is-unlocked {
+  background: rgba(76, 58, 34, 0.98);
+}
+
+.soul-hex-node span {
+  display: block;
+  max-width: 72px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.soul-node-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(247, 239, 224, 0.1);
+}
+
+.soul-node-icon span,
+.soul-node-icon::before,
+.soul-node-icon::after {
+  position: absolute;
+  display: block;
+  content: '';
+}
+
+.icon-attack span {
+  width: 5px;
+  height: 24px;
+  border-radius: 99px;
+  background: #ffcf7a;
+  transform: rotate(38deg);
+}
+
+.icon-attack::before {
+  width: 13px;
+  height: 5px;
+  background: #f7efe0;
+  transform: translateY(4px) rotate(38deg);
+}
+
+.icon-defense span {
+  width: 22px;
+  height: 24px;
+  background: #77b7ff;
+  clip-path: polygon(50% 0, 88% 18%, 76% 78%, 50% 100%, 24% 78%, 12% 18%);
+}
+
+.icon-hp span {
+  width: 20px;
+  height: 18px;
+  background: #ff6b5f;
+  transform: rotate(45deg);
+}
+
+.icon-hp::before,
+.icon-hp::after {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ff6b5f;
+}
+
+.icon-hp::before {
+  transform: translate(-6px, -4px);
+}
+
+.icon-hp::after {
+  transform: translate(4px, -4px);
+}
+
+.icon-mp span {
+  width: 18px;
+  height: 24px;
+  border-radius: 50% 50% 54% 54%;
+  background: #7cc7ff;
+  transform: rotate(18deg);
+}
+
+.icon-special span {
+  width: 22px;
+  height: 22px;
+  background: #d8a657;
+  clip-path: polygon(50% 0, 62% 36%, 100% 50%, 62% 64%, 50% 100%, 38% 64%, 0 50%, 38% 36%);
+}
+
+.soul-node-detail {
+  position: relative;
+  height: 176px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(216, 166, 87, 0.28);
+  border-radius: 18px;
+  background: rgba(20, 25, 37, 0.92);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  box-sizing: border-box;
+  scrollbar-width: thin;
+}
+
+.soul-node-detail-main {
+  min-width: 0;
+}
+
+.soul-node-detail-action {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  justify-items: stretch;
+}
+
+.soul-node-detail-action small {
+  margin: 0;
+  color: #ffd166;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.soul-node-detail-action .lobby-menu-button {
+  min-height: 38px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.soul-node-detail-action .lobby-menu-button span {
+  font-size: 12px;
+}
+
+.soul-node-detail h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.soul-node-detail strong {
+  display: block;
+  margin-top: 6px;
+  color: #ffd166;
+  font-size: 13px;
+}
+
+.soul-node-detail p {
+  margin: 8px 0;
+  color: #d5dbe8;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.soul-node-detail small {
+  display: block;
+  margin-bottom: 10px;
+  color: #9fb4d8;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.soul-story-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.48);
+}
+
+.soul-story-modal {
+  position: relative;
+  width: min(100%, 320px);
+  padding: 20px;
+  border: 1px solid rgba(255, 209, 102, 0.5);
+  border-radius: 18px;
+  background: #101521;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  color: #f7efe0;
+}
+
+.soul-story-modal h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.soul-story-modal p:not(.lobby-eyebrow) {
+  margin: 10px 0 0;
+  color: #d5dbe8;
+  font-size: 13px;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.soul-story-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(216, 166, 87, 0.3);
+  border-radius: 50%;
+  color: #f7efe0;
+  background: rgba(32, 40, 58, 0.94);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 @media (max-width: 720px) {

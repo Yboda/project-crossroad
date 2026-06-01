@@ -200,6 +200,12 @@ function BodySelectLobby({ narrative, isVisible, onChoice }) {
 }
 
 function SoulNodesLobby({ narrative, isVisible, onChoice }) {
+  const nodeOptions = narrative.options.filter((option) => option.type === 'unlock-soul-node')
+  const backOption = narrative.options.find((option) => option.type === 'back-to-lobby')
+  const [selectedNodeId, setSelectedNodeId] = useState(nodeOptions[0]?.nodeId ?? null)
+  const [isModalOpen, setIsModalOpen] = useState(Boolean(narrative.modal))
+  const selectedNode = nodeOptions.find((option) => option.nodeId === selectedNodeId) ?? nodeOptions[0]
+
   return (
     <aside className={`lobby-screen soul-screen ${isVisible ? 'is-visible' : 'is-hidden'}`}>
       <div className="lobby-topbar">
@@ -207,28 +213,112 @@ function SoulNodesLobby({ narrative, isVisible, onChoice }) {
           <p className="lobby-eyebrow">SOUL ENGRAVING</p>
           <h2>{narrative.title}</h2>
         </div>
-        <button className="lobby-link-button" onClick={() => onChoice('back-to-lobby')} type="button">
+        <button className="lobby-link-button" onClick={() => onChoice(backOption?.id ?? 'back-to-lobby')} type="button">
           돌아가기
         </button>
       </div>
 
       <p className="lobby-description">{narrative.story.join(' ')}</p>
 
-      <div className="soul-node-grid">
-        {narrative.options.map((option) => (
-          <button
-            className="soul-node-card"
-            disabled={option.locked || !isVisible}
-            key={option.id}
-            onClick={() => onChoice(option.id)}
-            type="button"
-          >
-            <span>{option.locked ? '잠김' : option.label}</span>
-            {option.detail ? <small>{option.detail}</small> : null}
-          </button>
-        ))}
+      <div className="soul-board">
+        <div className="soul-node-map" aria-label="영혼 각인 노드">
+          <div className="soul-node-canvas">
+            <div className="soul-node-canvas-inner">
+              <svg className="soul-node-links" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+                {nodeOptions.flatMap((option) =>
+                  option.requirements.map((requiredId) => {
+                    const parent = nodeOptions.find((node) => node.nodeId === requiredId)
+                    if (!parent?.position || !option.position) {
+                      return null
+                    }
+
+                    const isActive = parent.unlocked && option.unlocked
+
+                    return (
+                      <line
+                        className={isActive ? 'is-active' : ''}
+                        key={`${requiredId}-${option.nodeId}`}
+                        x1={parent.position.x}
+                        x2={option.position.x}
+                        y1={parent.position.y}
+                        y2={option.position.y}
+                      />
+                    )
+                  }),
+                )}
+              </svg>
+              {nodeOptions.map((option) => (
+                <button
+                  className={`soul-hex-node route-${option.route} ${option.unlocked ? 'is-unlocked' : ''} ${
+                    option.locked ? 'is-locked' : ''
+                  } ${selectedNode?.nodeId === option.nodeId ? 'is-selected' : ''}`}
+                  disabled={!isVisible}
+                  key={option.id}
+                  onClick={() => setSelectedNodeId(option.nodeId)}
+                  style={{ '--node-x': `${option.position?.x ?? 50}%`, '--node-y': `${option.position?.y ?? 50}%` }}
+                  type="button"
+                >
+                  <SoulNodeIcon type={option.iconType} />
+                  <span>{option.summary}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {selectedNode ? (
+          <div className="soul-node-detail" role="status">
+            <div className="soul-node-detail-main">
+              <p className="lobby-eyebrow">선택한 각인</p>
+              <h3>{selectedNode.label}</h3>
+              <strong>{selectedNode.summary}</strong>
+              <p>{selectedNode.abilityDescription}</p>
+              <small>
+                {selectedNode.unlocked
+                  ? '이미 영혼에 새겨진 각인입니다.'
+                  : selectedNode.locked
+                    ? `필요 조건: ${
+                        selectedNode.requirementLabels.length ? selectedNode.requirementLabels.join(', ') : '영혼의 흔적'
+                      }`
+                    : '새길 수 있는 각인입니다.'}
+              </small>
+            </div>
+            <div className="soul-node-detail-action">
+              <small>영혼의 흔적 {selectedNode.cost}</small>
+              <button
+                className="lobby-menu-button is-primary"
+                disabled={selectedNode.locked || selectedNode.unlocked || !isVisible}
+                onClick={() => onChoice(selectedNode.id)}
+                type="button"
+              >
+                <span>{selectedNode.unlocked ? '각인 완료' : '각인'}</span>
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
+
+      {narrative.modal && isModalOpen ? (
+        <div className="soul-story-modal-backdrop">
+          <div className="soul-story-modal" role="dialog" aria-modal="true" aria-label={narrative.modal.title}>
+            <button className="soul-story-modal-close" onClick={() => setIsModalOpen(false)} type="button">
+              x
+            </button>
+            <p className="lobby-eyebrow">SOUL MEMORY</p>
+            <h3>{narrative.modal.title}</h3>
+            <p>{narrative.modal.story}</p>
+          </div>
+        </div>
+      ) : null}
     </aside>
+  )
+}
+
+function SoulNodeIcon({ type }) {
+  return (
+    <span className={`soul-node-icon icon-${type}`} aria-hidden="true">
+      <span />
+    </span>
   )
 }
 
