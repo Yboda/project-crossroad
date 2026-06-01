@@ -1,0 +1,46 @@
+export const soulNodes = [
+  {
+    id: 'hp-1',
+    label: '희미한 생존 본능',
+    cost: 3,
+    bonus: { maxHp: 4 },
+    memoryText: '차가운 돌바닥 위에서, 누군가가 다시 일어나라고 속삭였다.',
+  },
+  {
+    id: 'attack-1',
+    label: '손끝의 살의',
+    cost: 4,
+    bonus: { attack: 1 },
+    memoryText: '검을 쥔 손은 처음이 아닌 듯 익숙하게 떨렸다.',
+  },
+  {
+    id: 'defense-1',
+    label: '버티는 법',
+    cost: 4,
+    bonus: { defense: 1 },
+    memoryText: '너는 한때 누군가의 앞을 막아섰다. 이유는 기억나지 않는다.',
+  },
+  {
+    id: 'mp-1',
+    label: '남은 마력의 결',
+    cost: 5,
+    bonus: { maxMp: 1, mp: 1 },
+    memoryText: '영혼 안쪽에 푸른 선 하나가 다시 이어졌다.',
+  },
+  {
+    id: 'rare-reward-1',
+    label: '희귀한 잔향',
+    cost: 8,
+    requires: ['hp-1', 'attack-1'],
+    bonus: { rareRewardBonus: 5 },
+    memoryText: '시체더미 속 손들이 너에게 더 깊은 보상을 밀어 올렸다.',
+  },
+  {
+    id: 'core-route-1',
+    label: '아래에서 오는 빛',
+    cost: 10,
+    requires: ['mp-1', 'defense-1'],
+    bonus: { unlockCoreClue: true },
+    memoryText: '빛은 위에서 오는 것이 아니었다. 아래에서 반사되고 있었다.',
+  },
+]

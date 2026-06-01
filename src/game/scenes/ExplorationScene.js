@@ -1,18 +1,34 @@
 import Phaser from 'phaser'
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../constants'
-import { playerCharacter } from '../data/characters'
-import { createEnemy } from '../data/enemies'
-import { roomTypes } from '../data/rooms'
+import { getFloorByIndex, isFinalFloor } from '../data/floors'
+import { createBossEnemy, createEnemy } from '../data/enemies'
 import {
   applyEnemyIntent,
   applyPlayerAction,
-  applyReward,
-  createPlayerState,
-  createRewardOptions,
   getBattleActions,
   getEnemyIntent,
+  getSkillActions,
 } from '../systems/combatSystem'
+import { applyEventResult, createEventNarrative } from '../systems/eventSystem'
+import { createBodySelectNarrative, createLobbyNarrative, createSoulNodeNarrative } from '../systems/lobbySystem'
+import { applyEnemyDrop, applyReward, createRewardOptions } from '../systems/rewardSystem'
+import {
+  advanceRunDepth,
+  createInitialRunState,
+  moveToNextFloor,
+  recordRoomVisit,
+  selectRunBody,
+} from '../systems/runState'
+import { loadPersistentState, savePersistentState, settleRun } from '../systems/saveSystem'
+import { buyShopItem, createShopNarrative } from '../systems/shopSystem'
 import { createRoomOptions } from '../systems/roomGenerator'
+import {
+  checkCoreRouteUnlocked,
+  createFakeEndingNarrative,
+  createTrueEndingNarrative,
+  unlockMemory,
+} from '../systems/storyProgressSystem'
+import { unlockSoulNode } from '../systems/soulEngravingSystem'
 
 const LAYOUT = {
   heroX: 118,
@@ -28,12 +44,19 @@ export class ExplorationScene extends Phaser.Scene {
     super('ExplorationScene')
   }
 
+  update() {
+    this.syncEnemyAttachedUi()
+  }
+
   create() {
-    this.depth = 1
-    this.player = createPlayerState(playerCharacter)
-    this.currentRoom = roomTypes[0]
-    this.roomOptions = createRoomOptions(this.depth)
-    this.currentNarrative = this.createRoomNarrative(this.currentRoom)
+    this.persistentState = loadPersistentState()
+    this.runState = createInitialRunState(this.persistentState)
+    this.depth = this.runState.totalDepth
+    this.player = this.runState.player
+    this.currentFloor = getFloorByIndex(this.runState.floorIndex)
+    this.currentRoom = null
+    this.roomOptions = createRoomOptions(this.runState)
+    this.currentNarrative = createLobbyNarrative(this.runState, this.persistentState)
     this.isTransitioning = false
     this.currentEnemy = null
 
@@ -46,7 +69,7 @@ export class ExplorationScene extends Phaser.Scene {
 
   createWorld() {
     this.background = this.add
-      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, this.currentRoom.backgroundKey)
+      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, this.currentFloor.backgroundKey)
       .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
 
     this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.18).setOrigin(0)
@@ -68,19 +91,21 @@ export class ExplorationScene extends Phaser.Scene {
 
   createHud() {
     this.depthText = this.add
-      .text(18, 18, `깊이 ${this.depth}`, {
+      .text(18, 18, this.currentFloor.name, {
         color: '#f7efe0',
         fontFamily: 'system-ui, Segoe UI, sans-serif',
-        fontSize: '21px',
+        fontSize: '20px',
         fontStyle: '700',
       })
       .setDepth(5)
 
     this.characterText = this.add
-      .text(18, 48, this.createCharacterHudText(), {
+      .text(18, 46, this.createCharacterHudText(), {
         color: '#d8a657',
         fontFamily: 'system-ui, Segoe UI, sans-serif',
-        fontSize: '14px',
+        fontSize: '12px',
+        lineSpacing: 2,
+        wordWrap: { width: GAME_WIDTH - 36 },
       })
       .setDepth(5)
   }
@@ -121,8 +146,19 @@ export class ExplorationScene extends Phaser.Scene {
         strokeThickness: 3,
       })
       .setOrigin(0.5)
+    this.playerBlockText = this.add
+      .text(0, 36, '', {
+        color: '#77b7ff',
+        fontFamily: 'system-ui, Segoe UI, sans-serif',
+        fontSize: '12px',
+        fontStyle: '800',
+        stroke: '#080b12',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setVisible(false)
 
-    this.playerBattleHud.add([this.playerHpBarBg, this.playerHpBar, this.playerHpText])
+    this.playerBattleHud.add([this.playerHpBarBg, this.playerHpBar, this.playerHpText, this.playerBlockText])
     this.updatePlayerBattleHud()
   }
 
@@ -143,12 +179,23 @@ export class ExplorationScene extends Phaser.Scene {
         strokeThickness: 3,
       })
       .setOrigin(0.5)
+    this.enemyBlockText = this.add
+      .text(0, 36, '', {
+        color: '#77b7ff',
+        fontFamily: 'system-ui, Segoe UI, sans-serif',
+        fontSize: '12px',
+        fontStyle: '800',
+        stroke: '#080b12',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setVisible(false)
 
-    this.enemyBattleHud.add([this.enemyHpBarBg, this.enemyHpBar, this.enemyHpText])
+    this.enemyBattleHud.add([this.enemyHpBarBg, this.enemyHpBar, this.enemyHpText, this.enemyBlockText])
   }
 
   createCharacterHudText() {
-    return `${playerCharacter.name} · HP ${this.player.hp}/${this.player.maxHp} · 공격 ${this.player.attack} · 방어 ${this.player.defense}`
+    return `HP ${this.player.hp}/${this.player.maxHp} · MP ${this.player.mp}/${this.player.maxMp} · 공격 ${this.player.attack} · 방어 ${this.player.defense}\n골드 ${this.runState.gold} · 영혼의 흔적 ${this.runState.memoryShards}`
   }
 
   updateHud() {
@@ -160,7 +207,9 @@ export class ExplorationScene extends Phaser.Scene {
   updatePlayerBattleHud() {
     const hpRatio = Phaser.Math.Clamp(this.player.hp / this.player.maxHp, 0, 1)
     this.playerHpBar.displayWidth = 108 * hpRatio
-    this.playerHpText.setText(`HP ${this.player.hp}/${this.player.maxHp}`)
+    this.playerHpText.setText(`HP ${this.player.hp}/${this.player.maxHp} · MP ${this.player.mp}/${this.player.maxMp}`)
+    this.playerBlockText.setText(`방어도 ${this.player.block}`)
+    this.playerBlockText.setVisible(this.player.block > 0)
   }
 
   updateEnemyBattleHud() {
@@ -171,7 +220,9 @@ export class ExplorationScene extends Phaser.Scene {
     const hpRatio = Phaser.Math.Clamp(this.currentEnemy.hp / this.currentEnemy.maxHp, 0, 1)
     this.enemyHpBar.displayWidth = 108 * hpRatio
     this.enemyHpText.setText(`HP ${this.currentEnemy.hp}/${this.currentEnemy.maxHp}`)
-    this.enemyBattleHud.setPosition(this.enemySprite.x, this.enemySprite.y + 22)
+    this.enemyBlockText.setText(`방어도 ${this.currentEnemy.block}`)
+    this.enemyBlockText.setVisible(this.currentEnemy.block > 0)
+    this.syncEnemyAttachedUi()
   }
 
   setupChoiceInput() {
@@ -189,8 +240,26 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   createRoomNarrative(room) {
-    if (room.id === 'battle') {
+    if (room.type === 'battle' || room.type === 'boss') {
       return this.createBattleIntroNarrative(room)
+    }
+
+    if (room.type === 'event' || room.type === 'mystery') {
+      return createEventNarrative(room.eventId, this.player)
+    }
+
+    if (room.type === 'shop') {
+      return createShopNarrative(this.player, this.runState)
+    }
+
+    if (room.type === 'rest') {
+      return this.createRestNarrative()
+    }
+
+    if (room.type === 'ending') {
+      return checkCoreRouteUnlocked(this.persistentState, this.runState)
+        ? createTrueEndingNarrative()
+        : createFakeEndingNarrative(this.runState)
     }
 
     return {
@@ -199,6 +268,23 @@ export class ExplorationScene extends Phaser.Scene {
       story: room.story,
       prompt: room.prompt ?? '당신은,',
       options: this.createUiOptions(room.options ?? this.createTravelChoices()),
+    }
+  }
+
+  createRestNarrative() {
+    return {
+      id: `rest-${this.runState.totalDepth}`,
+      title: '희미한 모닥불',
+      story: [
+        '꺼져가는 모닥불이 당신의 그림자를 길게 늘인다.',
+        '잠깐의 휴식은 이 미궁에서 허락되는 가장 수상한 친절이다.',
+      ],
+      prompt: '당신은,',
+      options: this.createUiOptions([
+        { id: 'rest-hp', label: '상처를 돌본다.', detail: 'HP를 35% 회복한다.', type: 'rest', restType: 'hp' },
+        { id: 'rest-mp', label: '호흡을 가다듬는다.', detail: 'MP를 모두 회복한다.', type: 'rest', restType: 'mp' },
+        { id: 'leave-rest', label: '바로 떠난다.', detail: '다음 장소로 이동한다.', type: 'continue-run' },
+      ]),
     }
   }
 
@@ -255,16 +341,28 @@ export class ExplorationScene extends Phaser.Scene {
 
     return {
       id: `battle-turn-${this.depth}-${this.currentEnemy.turn}-${this.player.hp}-${this.currentEnemy.hp}`,
-      title: `내 턴 · ${this.currentEnemy.name}와의 전투`,
+      title: `${this.currentEnemy.name}와의 전투`,
       story: [
-        `현재는 당신의 턴이다. 행동을 선택하면 즉시 처리되고, 이어서 적이 예고한 행동을 실행한다.`,
-        `당신: HP ${this.player.hp}/${this.player.maxHp} · 방어도 ${this.player.block} · 분노 ${this.player.rage}`,
+        `당신: HP ${this.player.hp}/${this.player.maxHp} · MP ${this.player.mp}/${this.player.maxMp} · 방어도 ${this.player.block}`,
         `${this.currentEnemy.name}: HP ${this.currentEnemy.hp}/${this.currentEnemy.maxHp} · 방어도 ${this.currentEnemy.block}`,
         `적의 다음 행동: ${intent.description}`,
         ...log,
       ],
-      prompt: '행동을 선택하세요.',
-      options: this.createUiOptions(getBattleActions(this.player)),
+      prompt: '당신의 턴입니다. 행동을 선택하세요.',
+      options: this.createUiOptions(getBattleActions(this.player, this.currentEnemy)),
+    }
+  }
+
+  createSkillNarrative() {
+    return {
+      id: `skill-select-${this.depth}-${this.player.mp}-${this.currentEnemy.hp}`,
+      title: '스킬 선택',
+      story: [
+        `사용할 스킬을 선택하세요. 현재 MP는 ${this.player.mp}/${this.player.maxMp}입니다.`,
+        `${this.currentEnemy.name}: HP ${this.currentEnemy.hp}/${this.currentEnemy.maxHp} · 방어도 ${this.currentEnemy.block}`,
+      ],
+      prompt: '스킬을 선택하세요.',
+      options: this.createUiOptions(getSkillActions(this.player, this.currentEnemy)),
     }
   }
 
@@ -283,8 +381,17 @@ export class ExplorationScene extends Phaser.Scene {
 
     this.intentIcon.setTexture(iconKeyByType[intent.type] ?? 'intent-attack')
     this.intentText.setText(`${valuePrefix}${intent.value}`)
-    this.intentIndicator.setPosition(this.enemySprite.x, this.enemySprite.y - 142)
+    this.syncEnemyAttachedUi()
     this.intentIndicator.setVisible(true)
+  }
+
+  syncEnemyAttachedUi() {
+    if (!this.enemySprite?.visible) {
+      return
+    }
+
+    this.intentIndicator.setPosition(this.enemySprite.x, this.enemySprite.y - 142)
+    this.enemyBattleHud.setPosition(this.enemySprite.x, this.enemySprite.y + 22)
   }
 
   createVictoryNarrative(log = []) {
@@ -297,7 +404,7 @@ export class ExplorationScene extends Phaser.Scene {
         ...log,
       ],
       prompt: '보상을 하나 선택하세요.',
-      options: this.createUiOptions(createRewardOptions(this.player)),
+      options: this.createUiOptions(createRewardOptions(this.player, this.currentEnemy)),
     }
   }
 
@@ -310,9 +417,28 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   startIdleMotion() {
+    this.tweens.killTweensOf(this.hero)
+    this.tweens.killTweensOf(this.playerBattleHud)
     this.tweens.add({
       targets: this.hero,
       y: this.hero.y - 7,
+      duration: 1250,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    })
+
+    this.tweens.add({
+      targets: this.playerBattleHud,
+      y: this.playerBattleHud.y - 7,
+      duration: 1250,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    })
+
+    this.tweens.add({
+      targets: this.hero,
       scaleX: LAYOUT.heroScale + 0.02,
       scaleY: LAYOUT.heroScale - 0.02,
       duration: 1250,
@@ -336,24 +462,6 @@ export class ExplorationScene extends Phaser.Scene {
     })
 
     this.tweens.add({
-      targets: this.intentIndicator,
-      y: this.intentIndicator.y - 6,
-      duration: 980,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.inOut',
-    })
-
-    this.tweens.add({
-      targets: this.enemyBattleHud,
-      y: this.enemyBattleHud.y - 6,
-      duration: 980,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.inOut',
-    })
-
-    this.tweens.add({
       targets: this.enemySprite,
       scaleX: LAYOUT.enemyScale + 0.04,
       scaleY: LAYOUT.enemyScale - 0.04,
@@ -366,7 +474,7 @@ export class ExplorationScene extends Phaser.Scene {
 
   animateHeroAttack() {
     this.tweens.add({
-      targets: this.hero,
+      targets: [this.hero, this.playerBattleHud],
       x: LAYOUT.heroX + 34,
       duration: 120,
       yoyo: true,
@@ -472,6 +580,78 @@ export class ExplorationScene extends Phaser.Scene {
       return
     }
 
+    if (option.type === 'select-body') {
+      selectRunBody(this.runState, option.body, this.persistentState)
+      this.player = this.runState.player
+      this.updateHud()
+      this.currentNarrative = createBodySelectNarrative(this.runState)
+      this.publishNarrative()
+      return
+    }
+
+    if (option.type === 'open-body-select') {
+      this.currentNarrative = createBodySelectNarrative(this.runState)
+      this.publishNarrative()
+      return
+    }
+
+    if (option.type === 'open-soul-nodes') {
+      this.currentNarrative = createSoulNodeNarrative(this.persistentState)
+      this.publishNarrative()
+      return
+    }
+
+    if (option.type === 'unlock-soul-node') {
+      const result = unlockSoulNode(option.nodeId, this.persistentState)
+      savePersistentState(this.persistentState)
+      this.currentNarrative = {
+        id: `soul-node-result-${option.nodeId}`,
+        title: result.ok ? '기억이 새겨짐' : '각인 실패',
+        story: [result.message],
+        prompt: '당신은,',
+        options: this.createUiOptions([{ id: 'back-soul-nodes', label: '각인 목록으로 돌아간다.', type: 'open-soul-nodes' }]),
+      }
+      this.publishNarrative()
+      return
+    }
+
+    if (option.type === 'back-to-lobby') {
+      this.currentNarrative = createLobbyNarrative(this.runState, this.persistentState)
+      this.publishNarrative()
+      return
+    }
+
+    if (option.type === 'continue-run') {
+      this.continueRun()
+      return
+    }
+
+    if (option.type === 'run-end') {
+      this.endRun(option.reason)
+      return
+    }
+
+    if (option.type === 'event-choice') {
+      this.resolveEventChoice(option)
+      return
+    }
+
+    if (option.type === 'shop-buy') {
+      this.resolveShopBuy(option.item)
+      return
+    }
+
+    if (option.type === 'continue-shop') {
+      this.currentNarrative = createShopNarrative(this.player, this.runState)
+      this.publishNarrative()
+      return
+    }
+
+    if (option.type === 'rest') {
+      this.resolveRest(option.restType)
+      return
+    }
+
     if (option.type === 'dialogue') {
       const dialogue = this.currentRoom.dialogues?.[option.dialogueId]
       if (dialogue) {
@@ -488,6 +668,23 @@ export class ExplorationScene extends Phaser.Scene {
 
     if (option.type === 'battle-action') {
       this.resolveBattleAction(option.id)
+      return
+    }
+
+    if (option.type === 'open-skills') {
+      this.currentNarrative = this.createSkillNarrative()
+      this.publishNarrative()
+      return
+    }
+
+    if (option.type === 'skill-action') {
+      this.resolveBattleAction(option.id)
+      return
+    }
+
+    if (option.type === 'close-skills') {
+      this.currentNarrative = this.createBattleNarrative()
+      this.publishNarrative()
       return
     }
 
@@ -515,19 +712,189 @@ export class ExplorationScene extends Phaser.Scene {
     this.time.delayedCall(220, () => this.playRoomTransition(nextRoom))
   }
 
+  continueRun() {
+    if (!this.runState.currentBody) {
+      this.currentNarrative = createBodySelectNarrative(this.runState)
+      this.publishNarrative()
+      return
+    }
+
+    const nextRoom = this.roomOptions[0]
+    if (!nextRoom) {
+      return
+    }
+    this.isTransitioning = true
+    this.setUiVisibility(false)
+    this.time.delayedCall(220, () => this.playRoomTransition(nextRoom))
+  }
+
+  resolveEventChoice(option) {
+    const messages = applyEventResult(this.player, this.runState, option.result)
+    this.updateHud()
+    this.currentNarrative = {
+      id: `event-result-${option.id}`,
+      title: '사건의 결과',
+      story: messages,
+      prompt: '당신은,',
+      options: this.createUiOptions([{ id: 'event-continue', label: '다음 장소로 향한다.', detail: '미궁은 계속 이어진다.', type: 'continue-run' }]),
+    }
+    this.publishNarrative()
+  }
+
+  resolveShopBuy(item) {
+    const messages = buyShopItem(this.player, this.runState, item)
+    this.updateHud()
+    this.currentNarrative = {
+      id: `shop-result-${item.id}-${this.runState.gold}`,
+      title: '거래 완료',
+      story: messages,
+      prompt: '당신은,',
+      options: this.createUiOptions([
+        { id: 'shop-more', label: '더 둘러본다.', detail: `남은 골드 ${this.runState.gold}`, type: 'continue-shop' },
+        { id: 'shop-leave-after-buy', label: '상점을 떠난다.', detail: '다음 장소로 향한다.', type: 'continue-run' },
+      ]),
+    }
+    this.publishNarrative()
+  }
+
+  resolveRest(restType) {
+    if (restType === 'hp') {
+      const heal = Math.ceil(this.player.maxHp * 0.35)
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal)
+    }
+    if (restType === 'mp') {
+      this.player.mp = this.player.maxMp
+    }
+    this.updateHud()
+    this.currentNarrative = {
+      id: `rest-result-${restType}-${this.runState.totalDepth}`,
+      title: '짧은 휴식',
+      story: ['몸 안쪽의 떨림이 조금 가라앉는다.'],
+      prompt: '당신은,',
+      options: this.createUiOptions([{ id: 'rest-continue', label: '다음 장소로 향한다.', type: 'continue-run' }]),
+    }
+    this.publishNarrative()
+  }
+
+  endRun(reason) {
+    const gained = settleRun(this.runState, this.persistentState, reason)
+    if (reason === 'fake-ending') {
+      unlockMemory('fake-ending', this.persistentState)
+    }
+    if (reason === 'death') {
+      unlockMemory('first-death', this.persistentState)
+    }
+    if (reason === 'true-ending') {
+      unlockMemory('core-route', this.persistentState)
+    }
+    savePersistentState(this.persistentState)
+    this.runState = createInitialRunState(this.persistentState)
+    this.player = this.runState.player
+    this.depth = this.runState.totalDepth
+    this.currentRoom = null
+    this.currentFloor = getFloorByIndex(this.runState.floorIndex)
+    this.roomOptions = createRoomOptions(this.runState)
+    this.currentEnemy = null
+    this.enemySprite.setVisible(false)
+    this.intentIndicator.setVisible(false)
+    this.enemyBattleHud.setVisible(false)
+    this.playerBattleHud.setVisible(false)
+    this.background.setTexture(this.currentFloor.backgroundKey)
+    this.depthText.setText(this.currentFloor.name)
+    this.updateHud()
+    this.currentNarrative = {
+      ...createLobbyNarrative(this.runState, this.persistentState),
+      story: [
+        `이번 여정이 끝났다. 영혼의 흔적 ${gained}개가 남았다.`,
+        ...createLobbyNarrative(this.runState, this.persistentState).story,
+      ],
+    }
+    this.publishNarrative()
+  }
+
   startBattle() {
-    this.currentEnemy = createEnemy(this.depth)
+    const floor = getFloorByIndex(this.runState.floorIndex)
+    this.currentEnemy = this.currentRoom.type === 'boss'
+      ? createBossEnemy({ bossId: this.currentRoom.bossId, difficulty: floor.difficulty })
+      : createEnemy({
+          enemyPool: this.currentRoom.enemyPool,
+          totalDepth: this.runState.totalDepth,
+          difficulty: floor.difficulty,
+        })
+    const initiative = this.determineBattleInitiative()
     this.enemySprite.setTexture(this.currentEnemy.textureKey).setVisible(true).setAlpha(1)
+    this.hero.setPosition(LAYOUT.heroX, LAYOUT.heroY).setScale(LAYOUT.heroScale)
+    this.playerBattleHud.setPosition(LAYOUT.heroX, LAYOUT.heroY + 18)
     this.enemySprite.setPosition(LAYOUT.enemyX, LAYOUT.enemyY).setScale(LAYOUT.enemyScale)
     this.playerBattleHud.setVisible(true)
     this.enemyBattleHud.setVisible(true)
     this.updateHud()
-    this.updateIntentIndicator()
+    this.startIdleMotion()
     this.startEnemyIdleMotion()
+
+    if (initiative === 'enemy') {
+      this.startEnemyAmbush()
+      return
+    }
+
+    this.runState.hasStealthApproach = false
     this.currentNarrative = this.createBattleNarrative([
-      `${this.currentEnemy.name}가 길을 막아섰다.`,
+      `당신은 ${this.currentEnemy.name}의 뒤를 기습했습니다! (플레이어 턴)`,
     ])
     this.publishNarrative()
+  }
+
+  determineBattleInitiative() {
+    if (this.runState.hasStealthApproach || this.player.relics.includes('mist-step')) {
+      return 'player'
+    }
+
+    if (this.player.relics.includes('broken-clock') && Math.random() < 0.3) {
+      return 'player'
+    }
+
+    if (this.currentRoom.risk.includes('높음')) {
+      return 'enemy'
+    }
+
+    return 'player'
+  }
+
+  startEnemyAmbush() {
+    this.isTransitioning = true
+    this.intentIndicator.setVisible(false)
+    this.currentNarrative = {
+      id: `enemy-ambush-${this.depth}`,
+      title: '기습 당함',
+      story: [
+        `${this.currentEnemy.name}가 어둠 속에서 튀어나와 당신을 먼저 덮쳤습니다! (적 턴)`,
+      ],
+      prompt: '적의 턴입니다.',
+      options: [],
+    }
+    this.publishNarrative()
+
+    this.time.delayedCall(700, () => {
+      const enemyResult = applyEnemyIntent(this.player, this.currentEnemy)
+      this.animateEnemyAction(enemyResult)
+      this.showCombatFloat(enemyResult)
+      this.updateHud()
+
+      this.time.delayedCall(620, () => {
+        const ambushMessage = `${this.currentEnemy.name}가 어둠 속에서 튀어나와 당신을 먼저 덮쳤습니다! (적 턴)`
+        const log = [ambushMessage, enemyResult.message]
+        this.runState.hasStealthApproach = false
+
+        if (this.player.hp <= 0) {
+          this.currentNarrative = this.createDefeatNarrative(log)
+        } else {
+          this.currentNarrative = this.createBattleNarrative(log)
+        }
+
+        this.publishNarrative()
+        this.isTransitioning = false
+      })
+    })
   }
 
   resolveBattleAction(actionId) {
@@ -543,6 +910,14 @@ export class ExplorationScene extends Phaser.Scene {
     this.time.delayedCall(520, () => {
       if (this.currentEnemy.hp <= 0) {
         this.animateEnemyDefeat()
+        log.push(...applyEnemyDrop(this.runState, this.currentEnemy))
+        if (this.currentEnemy.memoryId) {
+          const memory = unlockMemory(this.currentEnemy.memoryId, this.persistentState)
+          if (memory) {
+            log.push(`기억 해금: ${memory.title}`)
+          }
+        }
+        savePersistentState(this.persistentState)
         this.updateHud()
         this.currentNarrative = this.createVictoryNarrative(log)
         this.publishNarrative()
@@ -577,16 +952,16 @@ export class ExplorationScene extends Phaser.Scene {
       story: [
         ...log,
         '무릎이 꺾이고 시야가 어둠에 잠긴다. 아직은 더 깊은 곳으로 나아갈 힘이 부족했다.',
-        '프로토타입에서는 다시 일어나는 선택지로 전투 흐름을 계속 확인할 수 있다.',
+        '떨어지는 감각 끝에서, 시체더미의 방이 다시 가까워진다.',
       ],
       prompt: '당신은,',
       options: this.createUiOptions([
         {
-          id: 'revive-prototype',
-          label: '다시 일어난다.',
-          detail: '체력을 절반 회복하고 다음 장소로 이동한다.',
-          type: 'reward',
-          reward: { type: 'revive', value: 0 },
+          id: 'settle-death',
+          label: '시체더미에서 다시 눈뜬다.',
+          detail: '영혼에 남은 흔적을 붙잡고 시체더미로 돌아간다.',
+          type: 'run-end',
+          reason: 'death',
         },
       ]),
     }
@@ -599,9 +974,20 @@ export class ExplorationScene extends Phaser.Scene {
       this.player.hp = Math.max(1, Math.floor(this.player.maxHp / 2))
       result = '당신은 간신히 다시 일어났다.'
     } else {
-      result = applyReward(this.player, reward)
+      result = applyReward(this.player, this.runState, reward)
     }
 
+    const defeatedBoss = this.currentEnemy?.isBoss ? this.currentEnemy.id : null
+    if (defeatedBoss) {
+      this.runState.defeatedBosses.push(defeatedBoss)
+      if (isFinalFloor(this.runState.floorIndex)) {
+        advanceRunDepth(this.runState)
+      } else {
+        moveToNextFloor(this.runState)
+      }
+      this.currentFloor = getFloorByIndex(this.runState.floorIndex)
+    }
+    this.roomOptions = createRoomOptions(this.runState)
     this.updateHud()
     this.currentEnemy = null
     this.enemySprite.setVisible(false)
@@ -616,13 +1002,21 @@ export class ExplorationScene extends Phaser.Scene {
         '이제 같은 길도 이전과는 다르게 느껴진다. 더 깊은 곳으로 향할 준비가 됐다.',
       ],
       prompt: '당신은,',
-      options: this.createUiOptions(this.createTravelChoices()),
+      options: this.createUiOptions([
+        {
+          id: 'post-reward-continue',
+          label: defeatedBoss ? '다음 층으로 오른다.' : '다음 장소로 향한다.',
+          detail: defeatedBoss ? '층의 문이 열린다.' : '미궁은 계속 이어진다.',
+          type: 'continue-run',
+        },
+      ]),
     }
     this.publishNarrative()
   }
 
   playRoomTransition(room) {
     this.tweens.killTweensOf(this.hero)
+    this.tweens.killTweensOf(this.playerBattleHud)
 
     this.tweens.add({
       targets: this.hero,
@@ -630,6 +1024,14 @@ export class ExplorationScene extends Phaser.Scene {
       y: this.hero.y - 46,
       scaleX: 0.68,
       scaleY: 0.68,
+      duration: 720,
+      ease: 'Sine.easeInOut',
+    })
+
+    this.tweens.add({
+      targets: this.playerBattleHud,
+      x: this.playerBattleHud.x + 46,
+      y: this.playerBattleHud.y - 46,
       duration: 720,
       ease: 'Sine.easeInOut',
     })
@@ -652,19 +1054,26 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   arriveAtRoom(room) {
-    this.depth += 1
+    advanceRunDepth(this.runState)
+    recordRoomVisit(this.runState, room)
+    this.depth = this.runState.totalDepth
     this.currentRoom = room
-    this.roomOptions = createRoomOptions(this.depth)
+    this.currentFloor = getFloorByIndex(this.runState.floorIndex)
+    this.roomOptions = createRoomOptions(this.runState)
 
     this.background.setTexture(room.backgroundKey)
     this.background.setScale(1)
     this.hero.setPosition(LAYOUT.heroX, LAYOUT.heroY).setScale(LAYOUT.heroScale)
+    this.playerBattleHud.setPosition(LAYOUT.heroX, LAYOUT.heroY + 18)
     this.enemySprite.setVisible(false)
     this.intentIndicator.setVisible(false)
     this.enemyBattleHud.setVisible(false)
     this.playerBattleHud.setVisible(false)
 
-    this.depthText.setText(`깊이 ${this.depth}`)
+    this.depthText.setText(this.currentFloor.name)
+    if (room.type === 'mystery') {
+      this.runState.hasStealthApproach = true
+    }
     this.currentNarrative = this.createRoomNarrative(room)
     this.publishNarrative()
 

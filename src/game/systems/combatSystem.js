@@ -1,21 +1,28 @@
+import { applyDefendRelics, getAttackBonus } from './relicSystem'
+
 export function createPlayerState(character) {
   return {
     hp: character.hp,
     maxHp: character.maxHp,
     attack: character.attack,
     defense: character.defense,
+    mp: character.mp,
+    maxMp: character.maxMp,
     block: 0,
-    rage: 0,
     relics: [],
   }
 }
 
-export function getBattleActions(player) {
+export function getBattleActions(player, enemy) {
+  const attackRawDamage = player.attack + getAttackBonus(player, enemy)
+  const attackDamage = Math.max(0, attackRawDamage - enemy.block)
+  const blockSuffix = enemy.block > 0 ? ` / 적 방어도 ${enemy.block} 상쇄 후 ${attackDamage}` : ''
+
   return [
     {
       id: 'attack',
       label: '공격한다.',
-      detail: `피해 ${player.attack} / 분노 +1`,
+      detail: `피해 ${attackRawDamage}${blockSuffix} / MP +1`,
       type: 'battle-action',
     },
     {
@@ -25,11 +32,39 @@ export function getBattleActions(player) {
       type: 'battle-action',
     },
     {
+      id: 'open-skills',
+      label: '스킬을 사용한다.',
+      detail: `MP ${player.mp}/${player.maxMp}`,
+      type: 'open-skills',
+    },
+  ]
+}
+
+export function getSkillActions(player, enemy) {
+  const heavyRawDamage = player.attack + 8
+  const heavyDamage = Math.max(0, heavyRawDamage - enemy.block)
+  const blockText = enemy.block > 0 ? ` / 적 방어도 ${enemy.block} 상쇄 후 ${heavyDamage}` : ''
+
+  return [
+    {
       id: 'heavy',
-      label: '강타를 날린다.',
-      detail: player.rage >= 2 ? `분노 2 소모 / 피해 ${player.attack + 8}` : '분노 2 필요',
-      type: 'battle-action',
-      locked: player.rage < 2,
+      label: '강타',
+      detail: player.mp >= 3 ? `MP 3 소모 / 피해 ${heavyRawDamage}${blockText}` : 'MP 3 필요',
+      type: 'skill-action',
+      locked: player.mp < 3,
+    },
+    {
+      id: 'mana-guard',
+      label: '마력 방패',
+      detail: player.mp >= 2 ? `MP 2 소모 / 방어도 ${player.defense + 4} 획득` : 'MP 2 필요',
+      type: 'skill-action',
+      locked: player.mp < 2,
+    },
+    {
+      id: 'cancel-skills',
+      label: '취소한다.',
+      detail: '스킬 선택을 닫는다.',
+      type: 'close-skills',
     },
   ]
 }
@@ -62,13 +97,13 @@ export function applyPlayerAction(player, enemy, actionId) {
   player.block = 0
 
   if (actionId === 'attack') {
-    const rawDamage = player.attack + (player.relics.includes('검은 가시') ? 1 : 0)
+    const rawDamage = player.attack + getAttackBonus(player, enemy)
     const damage = Math.max(0, rawDamage - enemy.block)
-    enemy.block = Math.max(0, enemy.block - rawDamage)
+    enemy.block = 0
     enemy.hp = Math.max(0, enemy.hp - damage)
-    player.rage += 1
+    player.mp = Math.min(player.maxMp, player.mp + 1)
     return {
-      message: `당신은 ${enemy.name}에게 ${damage}의 피해를 입혔다. 분노가 1 올랐다.`,
+      message: `당신은 ${enemy.name}에게 ${damage}의 피해를 입혔다. MP가 1 회복됐다.`,
       target: 'enemy',
       floatText: `-${damage}`,
       floatType: 'damage',
@@ -76,9 +111,11 @@ export function applyPlayerAction(player, enemy, actionId) {
   }
 
   if (actionId === 'defend') {
+    enemy.block = 0
     player.block += player.defense
+    const relicMessage = applyDefendRelics(player)
     return {
-      message: `당신은 자세를 낮추고 방어도 ${player.defense}을 얻었다.`,
+      message: [`당신은 자세를 낮추고 방어도 ${player.defense}을 얻었다.`, relicMessage].filter(Boolean).join(' '),
       target: 'player',
       floatText: `+${player.defense}`,
       floatType: 'block',
@@ -88,17 +125,31 @@ export function applyPlayerAction(player, enemy, actionId) {
   if (actionId === 'heavy') {
     const rawDamage = player.attack + 8
     const damage = Math.max(0, rawDamage - enemy.block)
-    enemy.block = Math.max(0, enemy.block - rawDamage)
+    enemy.block = 0
     enemy.hp = Math.max(0, enemy.hp - damage)
-    player.rage = Math.max(0, player.rage - 2)
+    player.mp = Math.max(0, player.mp - 3)
     return {
-      message: `당신은 힘을 모아 ${damage}의 큰 피해를 입혔다.`,
+      message: `당신은 MP를 집중해 ${damage}의 큰 피해를 입혔다.`,
       target: 'enemy',
       floatText: `-${damage}`,
       floatType: 'damage',
     }
   }
 
+  if (actionId === 'mana-guard') {
+    const block = player.defense + 4
+    enemy.block = 0
+    player.mp = Math.max(0, player.mp - 2)
+    player.block += block
+    return {
+      message: `당신은 마력으로 몸을 감싸 방어도 ${block}을 얻었다.`,
+      target: 'player',
+      floatText: `+${block}`,
+      floatType: 'block',
+    }
+  }
+
+  enemy.block = 0
   return {
     message: '당신은 망설였다.',
     target: 'player',
@@ -145,7 +196,7 @@ export function applyEnemyIntent(player, enemy) {
 }
 
 export function createRewardOptions(player) {
-  const hasThornRelic = player.relics.includes('검은 가시')
+  const hasThornRelic = player.relics.includes('black-thorn')
 
   return [
     {
@@ -169,7 +220,7 @@ export function createRewardOptions(player) {
       type: 'reward',
       reward: hasThornRelic
         ? { type: 'defense', value: 1 }
-        : { type: 'relic', value: '검은 가시' },
+        : { type: 'relic', value: 'black-thorn' },
     },
   ]
 }

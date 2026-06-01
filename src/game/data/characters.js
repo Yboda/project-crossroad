@@ -6,4 +6,6 @@ export const playerCharacter = {
   maxHp: 32,
   attack: 5,
   defense: 7,
+  mp: 4,
+  maxMp: 6,
 }

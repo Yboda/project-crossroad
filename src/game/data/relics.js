@@ -1,0 +1,17 @@
+export const relics = [
+  { id: 'black-thorn', name: '검은 가시', description: '공격할 때마다 추가 피해 +1', hooks: ['onAttack'] },
+  { id: 'old-shield-fragment', name: '낡은 방패 파편', description: '방어할 때 MP를 1 회복한다.', hooks: ['onDefend'] },
+  { id: 'mist-step', name: '안개 발걸음', description: '전투 시작 시 기습할 확률이 오른다.', hooks: ['onBattleStart'] },
+  { id: 'wardens-mark', name: '문지기의 표식', description: '문지기 관련 선택지를 해금한다.', hooks: ['storyFlag'] },
+  { id: 'broken-clock', name: '깨진 시계', description: '적의 첫 턴을 늦출 가능성이 생긴다.', hooks: ['onBattleStart'] },
+  { id: 'bone-dice', name: '뼈 주사위', description: '전투 보상 골드가 조금 증가한다.', hooks: ['onReward'] },
+  { id: 'warm-ember', name: '온기 남은 잿불', description: '휴식 시 MP도 회복한다.', hooks: ['onRest'] },
+  { id: 'glass-eye', name: '유리 눈', description: '이벤트 선택지의 위험을 더 잘 감지한다.', hooks: ['onEvent'] },
+  { id: 'rusted-key', name: '녹슨 열쇠', description: '상점 물품 가격이 감소한다.', hooks: ['onShop'] },
+  { id: 'nameless-prayer', name: '이름 없는 기도문', description: '죽음 뒤 남는 영혼의 흔적이 증가한다.', hooks: ['onRunEnd'] },
+  { id: 'red-thread', name: '붉은 실', description: '최대 HP가 3 증가한다.', hooks: ['stat'] },
+  { id: 'blue-thread', name: '푸른 실', description: '최대 MP가 1 증가한다.', hooks: ['stat'] },
+  { id: 'ashen-crown', name: '재의 왕관', description: '보스에게 주는 피해가 증가한다.', hooks: ['onAttack'] },
+  { id: 'corpse-map', name: '시체의 지도', description: '같은 방 타입 반복 확률을 낮춘다.', hooks: ['onRoomGen'] },
+  { id: 'sealed-name', name: '봉인된 이름', description: '중심부 루트의 기억 조건 일부를 대신한다.', hooks: ['storyFlag'] },
+]

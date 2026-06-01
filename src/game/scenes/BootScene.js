@@ -14,6 +14,13 @@ export class BootScene extends Phaser.Scene {
     this.createHeroTexture()
     this.createEnemyTexture('enemy-wolf', 0x2a3140, 0x8ba0b8)
     this.createEnemyTexture('enemy-imp', 0x4a1f1b, 0xff8a3d)
+    this.createEnemyTexture('enemy-rat', 0x2d2630, 0xd9d0ba)
+    this.createEnemyTexture('enemy-guard', 0x2f3442, 0xa7b0c4)
+    this.createEnemyTexture('enemy-moth', 0x30283f, 0xd8c6ff)
+    this.createEnemyTexture('enemy-wraith', 0x1b2030, 0x7cc7ff)
+    this.createEnemyTexture('enemy-knight', 0x222936, 0xffedb5)
+    this.createEnemyTexture('enemy-leech', 0x35202b, 0xff6b9a)
+    this.createEnemyTexture('enemy-hound', 0x241d22, 0xff8a3d)
     this.createIntentTextures()
     this.scene.start('ExplorationScene')
   }
