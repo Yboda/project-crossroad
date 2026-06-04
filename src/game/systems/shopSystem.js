@@ -1,5 +1,5 @@
 import { shopItems } from '../data/shopItems'
-import { relics } from '../data/relics'
+import { getShopSellableRelics } from '../data/relics'
 import { applyEventResult } from './eventSystem'
 import { getShopPriceMultiplier } from './relicSystem'
 
@@ -10,7 +10,7 @@ export function createShopInventory(player, runState, count = RELIC_COUNT) {
   const priceMultiplier = getShopPriceMultiplier(player)
 
   const potions = POTION_IDS.map((itemId) => shopItems.find((item) => item.id === itemId)).filter(Boolean)
-  const relicItems = shuffleRelics(relics, runState.totalDepth)
+  const relicItems = shuffleRelics(getShopSellableRelics(), runState.totalDepth)
     .filter((relic) => !player.relics.includes(relic.id))
     .slice(0, count)
     .map((relic, index) => ({
@@ -96,11 +96,11 @@ export function createShopScreenNarrative(runState, inventory, messages = []) {
 
 export function buyShopItem(player, runState, item) {
   if (runState.gold < item.price) {
-    return ['골드가 부족하다.']
+    return ['골드가 부족해 구매하지 못했다.']
   }
 
   if (item.result.relic && player.relics.includes(item.result.relic)) {
-    return ['이미 가지고 있는 유물이다.']
+    return ['이미 가지고 있는 유물이라 구매하지 않았다.']
   }
 
   runState.gold -= item.price

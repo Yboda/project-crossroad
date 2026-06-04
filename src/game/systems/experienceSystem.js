@@ -1,3 +1,5 @@
+import { formatStatGainMessage } from './rewardSystem'
+
 export function getExpToNextLevel(level) {
   return 10 + level * 8
 }
@@ -45,22 +47,22 @@ export function createLevelUpRewardOptions() {
   return [
     {
       id: 'level-attack',
-      label: '공격 감각',
-      detail: '공격력 +1',
+      label: '공격력 +1',
+      detail: '남은 감각으로 공격을 연습한다.',
       type: 'level-up-reward',
       reward: { type: 'attack', value: 1 },
     },
     {
       id: 'level-defense',
-      label: '방어 감각',
-      detail: '방어력 +1',
+      label: '방어력 +1',
+      detail: '다음 방어를 위해 자세를 연습한다.',
       type: 'level-up-reward',
       reward: { type: 'defense', value: 1 },
     },
     {
       id: 'level-hp',
-      label: '생존 감각',
-      detail: '최대 HP +4',
+      label: '최대 HP +4',
+      detail: '호흡을 이어가며 지구력을 단련한다.',
       type: 'level-up-reward',
       reward: { type: 'maxHp', value: 4 },
     },
@@ -71,18 +73,23 @@ export function applyLevelUpReward(player, reward) {
   if (reward.type === 'maxHp') {
     player.maxHp += reward.value
     player.hp = Math.min(player.maxHp, player.hp + reward.value)
-    return `최대 HP가 ${reward.value} 올랐다.`
+    return formatStatGainMessage('maxHp', reward.value)
   }
 
-  if (reward.type === 'attack' || reward.type === 'defense') {
-    player[reward.type] += reward.value
-    return `${reward.type === 'attack' ? '공격력' : '방어력'}이 ${reward.value} 올랐다.`
+  if (reward.type === 'attack') {
+    player.attack += reward.value
+    return formatStatGainMessage('attack', reward.value)
+  }
+
+  if (reward.type === 'defense') {
+    player.defense += reward.value
+    return formatStatGainMessage('defense', reward.value)
   }
 
   if (reward.type === 'maxMp') {
     player.maxMp += reward.value
     player.mp = Math.min(player.maxMp, player.mp + reward.value)
-    return `최대 MP가 ${reward.value} 올랐다.`
+    return formatStatGainMessage('maxMp', reward.value)
   }
 
   return '육체가 조금 더 익숙해졌다.'

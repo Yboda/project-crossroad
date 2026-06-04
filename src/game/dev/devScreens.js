@@ -27,6 +27,8 @@ export const DEV_SCREEN_GROUPS = [
       { id: 'combat', label: '전투 턴' },
       { id: 'combat-skills', label: '스킬 선택' },
       { id: 'victory', label: '승리 · 보상' },
+      { id: 'victory-relic', label: '승리 · 유물 획득' },
+      { id: 'victory-boss-relic', label: '승리 · 보스 유물' },
       { id: 'level-up', label: '레벨업' },
       { id: 'death', label: '사망' },
     ],

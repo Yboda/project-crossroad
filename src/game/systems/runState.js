@@ -54,17 +54,17 @@ export function recordRoomVisit(runState, room) {
 export function addRunReward(runState, reward) {
   if (reward.type === 'gold') {
     runState.gold += reward.value
-    return `골드 ${reward.value}을 얻었다.`
+    return `전리품을 골라 챙겼다. 골드 ${reward.value}.`
   }
 
   if (reward.type === 'memoryShards') {
     runState.memoryShards += reward.value
-    return `영혼의 흔적 ${reward.value}개를 얻었다.`
+    return `적의 잔향을 걷어 담았다. 영혼의 흔적 ${reward.value}개.`
   }
 
   if (reward.type === 'coreShards') {
     runState.coreShards += reward.value
-    return `핵의 파편 ${reward.value}개를 얻었다.`
+    return `깊은 잔향을 걷어 담았다. 핵의 파편 ${reward.value}개.`
   }
 
   return ''

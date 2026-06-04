@@ -10,7 +10,7 @@ import {
   getEnemyIntent,
   getSkillActions,
 } from '../systems/combatSystem'
-import { applyEventResult, createEventNarrative } from '../systems/eventSystem'
+import { applyEventResult, applyRest, createEventNarrative } from '../systems/eventSystem'
 import { createBodySelectNarrative, createLobbyNarrative, createSoulNodeNarrative } from '../systems/lobbySystem'
 import {
   applyLevelUpReward,
@@ -18,7 +18,16 @@ import {
   getLevelText,
   grantBattleExp,
 } from '../systems/experienceSystem'
-import { applyEnemyDrop, applyReward, createRewardOptions } from '../systems/rewardSystem'
+import {
+  applyEnemyDrop,
+  applyReward,
+  createRewardOptions,
+  formatMergedStatGainLines,
+  getStatGainFromReward,
+  parseVictoryLoot,
+  rollBossPendingRelic,
+  rollVictoryPendingRelic,
+} from '../systems/rewardSystem'
 import {
   advanceRunDepth,
   createInitialRunState,
@@ -38,6 +47,7 @@ import {
   unlockMemory,
 } from '../systems/storyProgressSystem'
 import { unlockSoulNode } from '../systems/soulEngravingSystem'
+import { getSkillById } from '../systems/skillSystem'
 
 const LAYOUT = {
   enemyX: 280,
@@ -58,6 +68,25 @@ const COMBAT_LAYOUT = {
   lungeDy: 38,
 }
 
+const POST_COMBAT_TRANSITION =
+  '이제 같은 길도 이전과는 다르게 느껴진다. 더 깊은 곳으로 향할 준비가 됐다.'
+
+const ROOM_TRANSITION_PEAK_ZOOM = 1.28
+
+function buildPostCombatStoryLines({ narrative, statGains = [] } = {}) {
+  const lines = []
+  if (narrative) {
+    lines.push(narrative)
+  }
+  for (const statLine of formatMergedStatGainLines(statGains)) {
+    if (statLine && statLine !== narrative) {
+      lines.push(statLine)
+    }
+  }
+  lines.push(POST_COMBAT_TRANSITION)
+  return lines
+}
+
 export class ExplorationScene extends Phaser.Scene {
   constructor() {
     super('ExplorationScene')
@@ -74,6 +103,7 @@ export class ExplorationScene extends Phaser.Scene {
     this.player = this.runState.player
     this.currentFloor = getFloorByIndex(this.runState.floorIndex)
     this.currentRoom = null
+    this.pendingFloorAdvance = null
     this.roomOptions = createRoomOptions(this.runState)
     this.currentNarrative = createLobbyNarrative(this.runState, this.persistentState)
     this.isTransitioning = false
@@ -108,7 +138,7 @@ export class ExplorationScene extends Phaser.Scene {
       .setDepth(20)
   }
 
-  applySceneBackground(backgroundKey, { lobby = false } = {}) {
+  applySceneBackground(backgroundKey, { lobby = false, fitFrame = true } = {}) {
     if (!this.background) {
       return
     }
@@ -117,13 +147,19 @@ export class ExplorationScene extends Phaser.Scene {
       if (this.textures.exists('background-lobby')) {
         this.background.setTexture('background-lobby').setDisplaySize(GAME_WIDTH, GAME_HEIGHT).clearTint()
       }
+      this.background?.setOrigin(0.5, 0.5).setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2).setScale(1)
       this.sceneDimmer?.setVisible(false)
       return
     }
 
     const textureKey = resolveBackgroundKey(backgroundKey)
     if (this.textures.exists(textureKey)) {
-      this.background.setTexture(textureKey).setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+      if (fitFrame) {
+        this.background.setTexture(textureKey).setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+        this.background.setOrigin(0.5, 0.5).setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2).setScale(1)
+      } else {
+        this.background.setTexture(textureKey)
+      }
     }
 
     const tone = getBackgroundDefinition(textureKey).explorationTone
@@ -233,6 +269,7 @@ export class ExplorationScene extends Phaser.Scene {
       bodyName: this.runState.currentBody?.name ?? '육체 미선택',
       bodyDescription: this.runState.currentBody?.description ?? '',
       floorName: this.currentFloor.name,
+      floorNumber: this.currentFloor.floorNumber ?? this.runState.floorIndex + 1,
       level: this.runState.level,
       exp: this.runState.exp,
       expToNext: this.runState.expToNext,
@@ -243,6 +280,7 @@ export class ExplorationScene extends Phaser.Scene {
       attack: this.player.attack,
       defense: this.player.defense,
       block: this.player.block,
+      skills: [...(this.player.skills ?? ['heavy', 'mana-guard'])],
       gold: this.runState.gold,
       memoryShards: this.runState.memoryShards,
       relics: this.player.relics.map((relicId) => getRelicById(relicId)),
@@ -269,7 +307,18 @@ export class ExplorationScene extends Phaser.Scene {
 
   setupChoiceInput() {
     this.handleChoiceEvent = (event) => {
-      const option = this.currentNarrative.options.find(({ id }) => id === event.detail.optionId)
+      const optionId = event.detail.optionId
+      let option = this.currentNarrative?.options?.find(({ id }) => id === optionId)
+
+      if (!option && this.currentNarrative?.layout === 'combat' && getSkillById(optionId)) {
+        option = { id: optionId, type: 'skill-action' }
+      }
+
+      if (!option && optionId.startsWith('victory-accept-relic-')) {
+        this.acceptVictoryRelic(optionId.slice('victory-accept-relic-'.length))
+        return
+      }
+
       if (option) {
         this.selectChoice(option)
       }
@@ -407,15 +456,53 @@ export class ExplorationScene extends Phaser.Scene {
     }))
   }
 
-  createBattleNarrative(log = []) {
+  setCombatLog(lines = []) {
+    this.combatLog = [...lines]
+  }
+
+  appendCombatLog(...lines) {
+    if (!this.combatLog) {
+      this.combatLog = []
+    }
+    for (const line of lines) {
+      if (line) {
+        this.combatLog.push(line)
+      }
+    }
+  }
+
+  publishCombatNarrative({ includeOptions = true } = {}) {
+    const intent = getEnemyIntent(this.currentEnemy)
+    this.currentNarrative = {
+      id: `battle-${this.depth}-${this.currentEnemy.turn}-${this.player.hp}-${this.currentEnemy.hp}-${this.combatLog.length}`,
+      layout: 'combat',
+      title: `${this.currentEnemy.name}와의 전투`,
+      story: [...(this.combatLog ?? [])],
+      prompt: includeOptions ? '당신의 턴입니다.' : '행동 중…',
+      options: includeOptions
+        ? this.createUiOptions(getBattleActions(this.player, this.currentEnemy))
+        : [],
+      combatMeta: {
+        ...this.createCombatMeta(intent),
+        actionsLocked: !includeOptions,
+      },
+    }
+    this.updateIntentIndicator(intent)
+    this.publishNarrative()
+  }
+
+  createBattleNarrative(log = null) {
+    if (log !== null) {
+      this.setCombatLog(log)
+    }
     const intent = getEnemyIntent(this.currentEnemy)
     this.updateIntentIndicator(intent)
 
     return {
-      id: `battle-turn-${this.depth}-${this.currentEnemy.turn}-${this.player.hp}-${this.currentEnemy.hp}`,
+      id: `battle-${this.depth}-${this.currentEnemy.turn}-${this.player.hp}-${this.currentEnemy.hp}-${this.combatLog?.length ?? 0}`,
       layout: 'combat',
       title: `${this.currentEnemy.name}와의 전투`,
-      story: log,
+      story: [...(this.combatLog ?? [])],
       prompt: '당신의 턴입니다.',
       options: this.createUiOptions(getBattleActions(this.player, this.currentEnemy)),
       combatMeta: this.createCombatMeta(intent),
@@ -459,9 +546,9 @@ export class ExplorationScene extends Phaser.Scene {
   buildVictoryStoryLines(log = []) {
     const defeatLine = `${this.currentEnemy.name}가 어둠 속으로 쓰러진다.`
     const aftermathLine = '숨을 고르는 사이, 몸 안쪽에서 조금 더 깊은 힘이 깨어나는 것이 느껴진다.'
-    const rewardLines = this.filterVictoryLogLines(log)
+    const storyExtras = log.filter((line) => line && /기억 해금:/.test(line))
 
-    return [defeatLine, aftermathLine, ...rewardLines]
+    return [defeatLine, aftermathLine, ...storyExtras]
   }
 
   createSkillNarrative() {
@@ -574,18 +661,70 @@ export class ExplorationScene extends Phaser.Scene {
     }
   }
 
-  createVictoryNarrative(log = []) {
+  createVictoryNarrative(log = [], pendingRelicOverride = undefined) {
+    const bossId = this.currentEnemy?.isBoss ? this.currentEnemy.id : null
+    const pendingBossRelicId = bossId ? rollBossPendingRelic(bossId, this.player) : null
+    const pendingRelicId =
+      pendingRelicOverride !== undefined ? pendingRelicOverride : rollVictoryPendingRelic(this.player)
+    const rewardEntries = createRewardOptions(this.player, this.currentEnemy, [
+      pendingRelicId,
+      pendingBossRelicId,
+    ])
+    const options = this.createUiOptions(rewardEntries)
+
     return {
       id: `victory-${this.depth}`,
       layout: 'victory',
       title: '전투 승리',
       story: this.buildVictoryStoryLines(log),
       prompt: '보상을 하나 선택하세요.',
-      options: this.createUiOptions(createRewardOptions(this.player, this.currentEnemy)),
+      victoryMeta: {
+        loot: parseVictoryLoot(log),
+        pendingRelicId: pendingRelicId || null,
+        pendingBossRelicId: pendingBossRelicId || null,
+        acquiredRelicId: null,
+        acquiredBossRelicId: null,
+      },
+      options,
     }
   }
 
-  createLevelUpNarrative(expResult, victoryLog = []) {
+  acceptVictoryRelic(relicId) {
+    if (!relicId || this.currentNarrative?.layout !== 'victory') {
+      return
+    }
+
+    const meta = this.currentNarrative.victoryMeta
+    const isBossRelic = meta?.pendingBossRelicId === relicId && !meta.acquiredBossRelicId
+    const isNormalRelic = meta?.pendingRelicId === relicId && !meta.acquiredRelicId
+
+    if (!isBossRelic && !isNormalRelic) {
+      return
+    }
+
+    if (!this.player.relics.includes(relicId)) {
+      this.player.relics.push(relicId)
+    }
+    this.updateHud()
+
+    this.currentNarrative = {
+      ...this.currentNarrative,
+      id: `${this.currentNarrative.id}-relic-${relicId}`,
+      options: this.currentNarrative.options.filter(
+        (option) => !(option.reward?.type === 'relic' && option.reward.value === relicId),
+      ),
+      victoryMeta: {
+        ...this.currentNarrative.victoryMeta,
+        pendingRelicId: isNormalRelic ? null : meta.pendingRelicId,
+        pendingBossRelicId: isBossRelic ? null : meta.pendingBossRelicId,
+        acquiredRelicId: isNormalRelic ? relicId : meta.acquiredRelicId,
+        acquiredBossRelicId: isBossRelic ? relicId : meta.acquiredBossRelicId,
+      },
+    }
+    this.publishNarrative()
+  }
+
+  createLevelUpNarrative(expResult, modal = null) {
     return {
       id: `level-up-${this.runState.level}-${this.depth}`,
       layout: 'level-up',
@@ -597,14 +736,26 @@ export class ExplorationScene extends Phaser.Scene {
         gainedExp: expResult.gained,
       },
       options: this.createUiOptions(createLevelUpRewardOptions()),
-      pendingVictoryLog: victoryLog,
+      modal,
     }
   }
 
-  showVictoryAfterLevelUp() {
-    const log = this.pendingVictoryLog ?? []
-    this.pendingVictoryLog = null
-    this.currentNarrative = this.createVictoryNarrative(log)
+  showPostCombatExploration(storyLines, defeatedBoss) {
+    this.currentNarrative = {
+      id: `post-combat-${this.depth}-${Date.now()}`,
+      layout: 'exploration',
+      story: storyLines,
+      prompt: '당신은,',
+      options: this.createUiOptions([
+        {
+          id: 'post-reward-continue',
+          label: defeatedBoss ? '다음 층으로 오른다.' : '다음 장소로 향한다.',
+          detail: defeatedBoss ? '층의 문이 열린다.' : '미궁은 계속 이어진다.',
+          type: 'continue-run',
+          variant: defeatedBoss ? 'floor-ascend' : undefined,
+        },
+      ]),
+    }
     this.publishNarrative()
   }
 
@@ -635,7 +786,12 @@ export class ExplorationScene extends Phaser.Scene {
     }
 
     const backgroundKey = this.currentRoom?.backgroundKey ?? this.currentFloor.backgroundKey
-    this.applySceneBackground(backgroundKey)
+    this.applySceneBackground(backgroundKey, { fitFrame: !this.isTransitioning })
+
+    if (!this.isTransitioning) {
+      this.stopRoomZoomTween()
+      this.resetBackgroundFrame()
+    }
   }
 
   publishNarrative() {
@@ -934,9 +1090,7 @@ export class ExplorationScene extends Phaser.Scene {
       return
     }
 
-    if (option.type === 'open-skills') {
-      this.currentNarrative = this.createSkillNarrative()
-      this.publishNarrative()
+    if (option.type === 'open-skills' || option.type === 'close-skills') {
       return
     }
 
@@ -945,38 +1099,18 @@ export class ExplorationScene extends Phaser.Scene {
       return
     }
 
-    if (option.type === 'close-skills') {
-      this.currentNarrative = this.createBattleNarrative()
-      this.publishNarrative()
-      return
-    }
-
     if (option.type === 'level-up-reward') {
-      const result = applyLevelUpReward(this.player, option.reward)
+      applyLevelUpReward(this.player, option.reward)
       this.updateHud()
-      this.currentNarrative = {
-        id: `level-up-result-${this.runState.level}`,
-        layout: 'exploration',
-        story: [
-          result,
-          '육체가 조금 더 익숙해진다. 다음 보상을 고를 때까지, 미궁의 공기는 차분하게 가라앉는다.',
-        ],
-        prompt: '당신은,',
-        options: this.createUiOptions([
-          {
-            id: 'continue-after-level-up',
-            label: '다음 보상을 고른다.',
-            detail: '전투 보상으로 이어진다.',
-            type: 'continue-after-level-up',
-          },
-        ]),
-      }
-      this.publishNarrative()
-      return
-    }
-
-    if (option.type === 'continue-after-level-up') {
-      this.showVictoryAfterLevelUp()
+      const storyLines = buildPostCombatStoryLines({
+        narrative: this.pendingVictoryRewardMessage,
+        statGains: [this.pendingVictoryStatGain, getStatGainFromReward(option.reward)].filter(Boolean),
+      })
+      const defeatedBoss = this.pendingVictoryDefeatedBoss ?? false
+      this.pendingVictoryRewardMessage = null
+      this.pendingVictoryStatGain = null
+      this.pendingVictoryDefeatedBoss = null
+      this.showPostCombatExploration(storyLines, defeatedBoss)
       return
     }
 
@@ -1016,12 +1150,32 @@ export class ExplorationScene extends Phaser.Scene {
     this.time.delayedCall(220, () => this.playRoomTransition(nextRoom))
   }
 
+  applyPendingFloorAdvance() {
+    if (!this.pendingFloorAdvance) {
+      return
+    }
+
+    if (this.pendingFloorAdvance === 'next-floor') {
+      moveToNextFloor(this.runState)
+    } else if (this.pendingFloorAdvance === 'final-depth') {
+      advanceRunDepth(this.runState)
+    }
+
+    this.pendingFloorAdvance = null
+    this.currentFloor = getFloorByIndex(this.runState.floorIndex)
+    this.roomOptions = createRoomOptions(this.runState)
+    this.updateHud()
+  }
+
   continueRun() {
     if (!this.runState.currentBody) {
       this.currentNarrative = createBodySelectNarrative(this.runState)
       this.publishNarrative()
       return
     }
+
+    this.applyPendingFloorAdvance()
+    this.updateHud()
 
     const nextRoom = this.roomOptions[0]
     if (!nextRoom) {
@@ -1036,13 +1190,12 @@ export class ExplorationScene extends Phaser.Scene {
     const relicWasOwned = option.result?.relic ? this.player.relics.includes(option.result.relic) : false
     const messages = applyEventResult(this.player, this.runState, option.result)
     this.updateHud()
-    const [mainResult, ...restResults] = messages
     this.currentNarrative = {
       id: `event-result-${option.id}`,
       layout: 'exploration',
       story: [
-        mainResult ?? '무언가가 조용히 바뀌었다.',
-        restResults.length ? restResults.join(' ') : '미궁은 당신의 선택을 기억한 채, 다음 길을 기다린다.',
+        ...messages,
+        '미궁은 당신의 선택을 기억한 채, 다음 길을 기다린다.',
       ],
       modal: option.result?.relic && !relicWasOwned ? this.createRelicModal(option.result.relic) : null,
       prompt: '당신은,',
@@ -1082,18 +1235,13 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   resolveRest(restType) {
-    if (restType === 'hp') {
-      const heal = Math.ceil(this.player.maxHp * 0.35)
-      this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal)
-    }
-    if (restType === 'mp') {
-      this.player.mp = this.player.maxMp
-    }
+    const effectLines = applyRest(this.player, restType)
     this.updateHud()
     this.currentNarrative = {
       id: `rest-result-${restType}-${this.runState.totalDepth}`,
       layout: 'exploration',
       story: [
+        ...effectLines,
         restType === 'hp'
           ? '뜨거운 숨이 천천히 가라앉는다. 상처가 아물 때마다, 몸은 조금 더 무거워진다.'
           : '마력의 파동이 가슴 안에서 잦아든다. 손끝의 떨림이 사라지고, 집중할 여백이 돌아온다.',
@@ -1121,6 +1269,7 @@ export class ExplorationScene extends Phaser.Scene {
     this.player = this.runState.player
     this.depth = this.runState.totalDepth
     this.currentRoom = null
+    this.pendingFloorAdvance = null
     this.currentShopInventory = null
     this.currentFloor = getFloorByIndex(this.runState.floorIndex)
     this.roomOptions = createRoomOptions(this.runState)
@@ -1162,18 +1311,23 @@ export class ExplorationScene extends Phaser.Scene {
     }
 
     this.runState.hasStealthApproach = false
-    this.currentNarrative = this.createBattleNarrative([
-      `당신은 ${this.currentEnemy.name}의 뒤를 기습했습니다! (플레이어 턴)`,
-    ])
-    this.publishNarrative()
+    this.setCombatLog([`당신은 ${this.currentEnemy.name}의 뒤를 기습했습니다! (플레이어 턴)`])
+    this.publishCombatNarrative()
   }
 
   determineBattleInitiative() {
-    if (this.runState.hasStealthApproach || this.player.relics.includes('mist-step')) {
+    if (
+      this.runState.hasStealthApproach ||
+      this.player.relics.includes('mist-step') ||
+      this.player.relics.includes('jailer-whisper')
+    ) {
       return 'player'
     }
 
-    if (this.player.relics.includes('broken-clock') && Math.random() < 0.3) {
+    if (
+      (this.player.relics.includes('broken-clock') || this.player.relics.includes('loop-fragment')) &&
+      Math.random() < 0.3
+    ) {
       return 'player'
     }
 
@@ -1187,34 +1341,25 @@ export class ExplorationScene extends Phaser.Scene {
   startEnemyAmbush() {
     this.isTransitioning = true
     this.intentIndicator.setVisible(false)
-    this.currentNarrative = {
-      id: `enemy-ambush-${this.depth}`,
-      layout: 'combat',
-      title: '기습 당함',
-      story: [
-        `${this.currentEnemy.name}가 어둠 속에서 튀어나와 당신을 먼저 덮쳤습니다! (적 턴)`,
-      ],
-      prompt: '적의 턴입니다.',
-      options: [],
-      combatMeta: this.createCombatMeta(getEnemyIntent(this.currentEnemy)),
-    }
-    this.publishNarrative()
+    const ambushMessage = `${this.currentEnemy.name}가 어둠 속에서 튀어나와 당신을 먼저 덮쳤습니다! (적 턴)`
+    this.setCombatLog([ambushMessage])
+    this.publishCombatNarrative({ includeOptions: false })
 
     this.time.delayedCall(700, () => {
       const enemyResult = applyEnemyIntent(this.player, this.currentEnemy)
+      this.appendCombatLog(enemyResult.message)
       this.animateEnemyAction(enemyResult)
       this.showCombatFloat(enemyResult)
       this.updateHud()
+      this.publishCombatNarrative({ includeOptions: false })
 
       this.time.delayedCall(620, () => {
-        const ambushMessage = `${this.currentEnemy.name}가 어둠 속에서 튀어나와 당신을 먼저 덮쳤습니다! (적 턴)`
-        const log = [ambushMessage, enemyResult.message]
         this.runState.hasStealthApproach = false
 
         if (this.player.hp <= 0) {
-          this.currentNarrative = this.createDefeatNarrative(log)
+          this.currentNarrative = this.createDefeatNarrative([...this.combatLog])
         } else {
-          this.currentNarrative = this.createBattleNarrative(log)
+          this.currentNarrative = this.createBattleNarrative()
         }
 
         this.publishNarrative()
@@ -1228,50 +1373,51 @@ export class ExplorationScene extends Phaser.Scene {
     this.intentIndicator.setVisible(false)
 
     const playerResult = applyPlayerAction(this.player, this.currentEnemy, actionId)
-    const log = [playerResult.message]
+    this.appendCombatLog(playerResult.message)
     this.animatePlayerAttack()
     this.showCombatFloat(playerResult)
     this.updateHud()
+    this.publishCombatNarrative({ includeOptions: false })
 
     this.time.delayedCall(520, () => {
       if (this.currentEnemy.hp <= 0) {
         this.animateEnemyDefeat()
-        log.push(...applyEnemyDrop(this.runState, this.currentEnemy))
+        const victoryLog = [...this.combatLog]
+        victoryLog.push(...applyEnemyDrop(this.runState, this.currentEnemy))
         const expResult = grantBattleExp(this.runState, this.currentEnemy)
         if (expResult.gained > 0) {
-          log.push(`경험치 +${expResult.gained}`)
+          victoryLog.push(`경험치 +${expResult.gained}`)
         }
         if (this.currentEnemy.memoryId) {
           const memory = unlockMemory(this.currentEnemy.memoryId, this.persistentState)
           if (memory) {
-            log.push(`기억 해금: ${memory.title}`)
+            victoryLog.push(`기억 해금: ${memory.title}`)
           }
         }
         savePersistentState(this.persistentState)
         this.updateHud()
         if (expResult.leveledUp) {
-          this.pendingVictoryLog = log
-          this.currentNarrative = this.createLevelUpNarrative(expResult, log)
-        } else {
-          this.currentNarrative = this.createVictoryNarrative(log)
+          this.pendingLevelUp = expResult
         }
+        this.currentNarrative = this.createVictoryNarrative(victoryLog)
         this.publishNarrative()
         this.isTransitioning = false
         return
       }
 
       const enemyResult = applyEnemyIntent(this.player, this.currentEnemy)
-      log.push(enemyResult.message)
+      this.appendCombatLog(enemyResult.message)
       this.animateEnemyAction(enemyResult)
       this.showCombatFloat(enemyResult)
       this.updateHud()
+      this.publishCombatNarrative({ includeOptions: false })
 
       this.time.delayedCall(620, () => {
         if (this.player.hp <= 0) {
           this.intentIndicator.setVisible(false)
-          this.currentNarrative = this.createDefeatNarrative(log)
+          this.currentNarrative = this.createDefeatNarrative([...this.combatLog])
         } else {
-          this.currentNarrative = this.createBattleNarrative(log)
+          this.currentNarrative = this.createBattleNarrative()
         }
 
         this.publishNarrative()
@@ -1295,12 +1441,13 @@ export class ExplorationScene extends Phaser.Scene {
       story: this.buildDefeatStoryLines(),
       deathMeta: {
         tracesThisRun: this.runState.memoryShards,
+        totalTraces: this.persistentState.memoryShards,
       },
       prompt: '당신은,',
       options: this.createUiOptions([
         {
           id: 'settle-death',
-          label: '시체더미에서 다시 눈뜬다.',
+          label: '시체더미의 방으로 돌아간다',
           detail: '영혼에 남은 흔적을 붙잡고 시체더미로 돌아간다.',
           type: 'run-end',
           reason: 'death',
@@ -1323,27 +1470,37 @@ export class ExplorationScene extends Phaser.Scene {
     const defeatedBoss = this.currentEnemy?.isBoss ? this.currentEnemy.id : null
     if (defeatedBoss) {
       this.runState.defeatedBosses.push(defeatedBoss)
-      if (isFinalFloor(this.runState.floorIndex)) {
-        advanceRunDepth(this.runState)
-      } else {
-        moveToNextFloor(this.runState)
-      }
-      this.currentFloor = getFloorByIndex(this.runState.floorIndex)
+      this.pendingFloorAdvance = isFinalFloor(this.runState.floorIndex) ? 'final-depth' : 'next-floor'
+    } else {
+      this.roomOptions = createRoomOptions(this.runState)
     }
-    this.roomOptions = createRoomOptions(this.runState)
     this.updateHud()
     this.currentEnemy = null
     this.enemySprite.setVisible(false)
     this.intentIndicator.setVisible(false)
     this.enemyBattleHud.setVisible(false)
+
+    const relicModal = reward.type === 'relic' && !relicWasOwned ? this.createRelicModal(reward.value) : null
+
+    if (this.pendingLevelUp) {
+      const expResult = this.pendingLevelUp
+      this.pendingLevelUp = null
+      this.pendingVictoryRewardMessage = result
+      this.pendingVictoryStatGain = getStatGainFromReward(reward)
+      this.pendingVictoryDefeatedBoss = Boolean(defeatedBoss)
+      this.currentNarrative = this.createLevelUpNarrative(expResult, relicModal)
+      this.publishNarrative()
+      return
+    }
+
     this.currentNarrative = {
       id: `reward-result-${this.depth}`,
       layout: 'exploration',
-      story: [
-        result,
-        '이제 같은 길도 이전과는 다르게 느껴진다. 더 깊은 곳으로 향할 준비가 됐다.',
-      ],
-      modal: reward.type === 'relic' && !relicWasOwned ? this.createRelicModal(reward.value) : null,
+      story: buildPostCombatStoryLines({
+        narrative: result,
+        statGains: [getStatGainFromReward(reward)].filter(Boolean),
+      }),
+      modal: relicModal,
       prompt: '당신은,',
       options: this.createUiOptions([
         {
@@ -1351,27 +1508,68 @@ export class ExplorationScene extends Phaser.Scene {
           label: defeatedBoss ? '다음 층으로 오른다.' : '다음 장소로 향한다.',
           detail: defeatedBoss ? '층의 문이 열린다.' : '미궁은 계속 이어진다.',
           type: 'continue-run',
+          variant: defeatedBoss ? 'floor-ascend' : undefined,
         },
       ]),
     }
     this.publishNarrative()
   }
 
+  stopRoomZoomTween() {
+    if (this.roomZoomTween) {
+      this.roomZoomTween.stop()
+      this.roomZoomTween.remove()
+      this.roomZoomTween = null
+    }
+  }
+
+  resetBackgroundFrame() {
+    const bg = this.background
+    if (!bg) {
+      return
+    }
+
+    bg.setOrigin(0.5, 0.5)
+    bg.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+    bg.setScale(1)
+    bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+  }
+
+  setBackgroundZoom(zoom) {
+    const bg = this.background
+    if (!bg) {
+      return
+    }
+
+    bg.setScale(1)
+    bg.setDisplaySize(GAME_WIDTH * zoom, GAME_HEIGHT * zoom)
+  }
+
   playRoomTransition(room) {
-    this.tweens.add({
-      targets: this.background,
-      scaleX: 1.08,
-      scaleY: 1.08,
-      duration: 720,
-      ease: 'Sine.easeInOut',
+    const enterMs = 580
+    const motion = { zoom: 1 }
+
+    this.stopRoomZoomTween()
+    this.tweens.killTweensOf([this.overlay])
+    this.resetBackgroundFrame()
+
+    this.roomZoomTween = this.tweens.add({
+      targets: motion,
+      zoom: ROOM_TRANSITION_PEAK_ZOOM,
+      duration: enterMs,
+      ease: 'Cubic.easeIn',
+      onUpdate: () => this.setBackgroundZoom(motion.zoom),
+      onComplete: () => {
+        this.roomZoomTween = null
+        this.arriveAtRoom(room)
+      },
     })
 
     this.tweens.add({
       targets: this.overlay,
-      alpha: 0.88,
-      duration: 720,
-      ease: 'Sine.easeInOut',
-      onComplete: () => this.arriveAtRoom(room),
+      alpha: 0.5,
+      duration: enterMs,
+      ease: 'Quad.easeIn',
     })
   }
 
@@ -1384,8 +1582,10 @@ export class ExplorationScene extends Phaser.Scene {
     this.currentFloor = getFloorByIndex(this.runState.floorIndex)
     this.roomOptions = createRoomOptions(this.runState)
 
-    this.applySceneBackground(room.backgroundKey)
-    this.background.setScale(1)
+    this.stopRoomZoomTween()
+    this.applySceneBackground(room.backgroundKey, { fitFrame: false })
+    this.setBackgroundZoom(ROOM_TRANSITION_PEAK_ZOOM)
+
     this.enemySprite.setVisible(false)
     this.intentIndicator.setVisible(false)
     this.enemyBattleHud.setVisible(false)
@@ -1395,15 +1595,28 @@ export class ExplorationScene extends Phaser.Scene {
     this.currentNarrative = this.createRoomNarrative(room)
     this.publishNarrative()
 
-    this.tweens.add({
-      targets: this.overlay,
-      alpha: 0,
-      duration: 360,
-      ease: 'Sine.easeOut',
+    const settleMs = 420
+    const motion = { zoom: ROOM_TRANSITION_PEAK_ZOOM }
+
+    this.roomZoomTween = this.tweens.add({
+      targets: motion,
+      zoom: 1,
+      duration: settleMs,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => this.setBackgroundZoom(motion.zoom),
       onComplete: () => {
+        this.roomZoomTween = null
+        this.resetBackgroundFrame()
         this.isTransitioning = false
         this.setUiVisibility(true)
       },
+    })
+
+    this.tweens.add({
+      targets: this.overlay,
+      alpha: 0,
+      duration: settleMs,
+      ease: 'Cubic.easeOut',
     })
   }
 }

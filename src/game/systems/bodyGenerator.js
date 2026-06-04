@@ -1,6 +1,6 @@
 import { bodyClasses } from '../data/bodyClasses'
 
-export function createBodyCandidates(persistentState, count = 3) {
+export function createBodyCandidates(persistentState, count = bodyClasses.length) {
   const unlockedCount = persistentState.unlockedSoulNodes?.length ?? 0
 
   return bodyClasses.slice(0, count).map((bodyClass, index) => ({

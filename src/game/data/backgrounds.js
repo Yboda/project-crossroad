@@ -19,8 +19,8 @@ export const BACKGROUND_TEXTURES = {
   'background-basic': {
     url: basicBackgroundUrl,
     explorationTone: {
-      tint: 0x9e9e9e,
-      dimAlpha: 0.48,
+      tint: 0xb8b8b8,
+      dimAlpha: 0.26,
     },
   },
 }

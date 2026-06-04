@@ -117,6 +117,34 @@ export const events = [
     ],
   },
   {
+    id: 'black-thorn-wall',
+    title: '가시 돋친 벽',
+    story: [
+      '좁은 통로 한쪽 벽면 전체가 식물로 뒤덮여 있다. 줄기는 돌 틈을 타고 위로 기어 올라가고, 잎사귀는 습기를 머금은 채 검게 젖어 있다.',
+      '가까이 다가가 보니 잎마다, 줄기마다 검은 가시가 촘촘히 돋아 있다. 가시 끝에서는 말라 있는 피 자국이 스며 나온다. 손을 대기 전에 무엇을 자를지 정해야 한다.',
+    ],
+    options: [
+      {
+        id: 'cut-thorns',
+        label: '가시를 자른다.',
+        detail: 'HP 10을 잃고 검은 가시 유물을 얻는다.',
+        result: { hp: -10, relic: 'black-thorn' },
+      },
+      {
+        id: 'cut-greens',
+        label: '줄기와 잎을 자른다.',
+        detail: '식물을 이용해 HP 10을 회복한다.',
+        result: { hp: 10 },
+      },
+      {
+        id: 'slip-past',
+        label: '피해서 지나간다.',
+        detail: '가시에 닿지 않고 통로를 빠져나간다.',
+        result: {},
+      },
+    ],
+  },
+  {
     id: 'wardens-mark',
     title: '문지기의 낡은 표식',
     story: [

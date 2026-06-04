@@ -30,8 +30,8 @@ export function applySoulBonuses(player, persistentState) {
     }
   }
 
-  player.hp = Math.min(player.maxHp, player.hp ?? player.maxHp)
-  player.mp = Math.min(player.maxMp, player.mp ?? player.maxMp)
+  player.hp = player.maxHp
+  player.mp = player.maxMp
   return player
 }
 

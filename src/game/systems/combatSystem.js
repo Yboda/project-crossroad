@@ -40,6 +40,39 @@ export function getBattleActions(player, enemy) {
   ]
 }
 
+export function getSkillPreview(skillId, player, enemy = { block: 0 }) {
+  const enemyBlock = enemy?.block ?? 0
+
+  if (skillId === 'heavy') {
+    const rawDamage = player.attack + 8
+    const finalDamage = Math.max(0, rawDamage - enemyBlock)
+    return { kind: 'damage', rawDamage, finalDamage, enemyBlock }
+  }
+
+  if (skillId === 'mana-guard') {
+    return { kind: 'block', block: player.defense + 4 }
+  }
+
+  return null
+}
+
+export function formatSkillPreviewStat(preview) {
+  if (!preview) return ''
+
+  if (preview.kind === 'damage') {
+    if (preview.enemyBlock > 0) {
+      return `피해 ${preview.rawDamage} · 방어도 ${preview.enemyBlock} 상쇄 후 ${preview.finalDamage}`
+    }
+    return `피해 ${preview.finalDamage}`
+  }
+
+  if (preview.kind === 'block') {
+    return `방어도 ${preview.block} 획득`
+  }
+
+  return ''
+}
+
 export function getSkillActions(player, enemy) {
   const heavyRawDamage = player.attack + 8
   const heavyDamage = Math.max(0, heavyRawDamage - enemy.block)
@@ -202,14 +235,16 @@ export function createRewardOptions(player) {
     {
       id: 'reward-attack',
       label: '공격력 +1',
-      detail: '모든 공격 피해가 오른다.',
+      detail: '승리의 여유를 공격 패턴 복기에 쓴다.',
       type: 'reward',
       reward: { type: 'attack', value: 1 },
     },
     {
       id: hasThornRelic ? 'reward-defense' : 'reward-thorn',
       label: hasThornRelic ? '방어력 +1' : '유물: 검은 가시',
-      detail: hasThornRelic ? '방어 행동으로 얻는 방어도가 오른다.' : '공격할 때마다 추가 피해 +1',
+      detail: hasThornRelic
+        ? '맞아 본 순간을 되짚으며 방어 자세를 연마한다.'
+        : '전장에 남은 기운 속에서 유물을 찾아 연결한다.',
       type: 'reward',
       reward: hasThornRelic
         ? { type: 'defense', value: 1 }
@@ -218,7 +253,7 @@ export function createRewardOptions(player) {
     {
       id: 'reward-max-hp',
       label: '최대 HP +5',
-      detail: '최대 HP +5',
+      detail: '호흡을 고르며 육체의 지구력을 끌어올린다.',
       type: 'reward',
       reward: { type: 'maxHp', value: 5 },
     },
@@ -229,19 +264,19 @@ export function applyReward(player, reward) {
   if (reward.type === 'maxHp') {
     player.maxHp += reward.value
     player.hp = Math.min(player.maxHp, player.hp + reward.value)
-    return `최대 체력이 ${reward.value} 올랐다.`
+    return '호흡을 고르며 육체의 지구력을 끌어올렸다.'
   }
 
   if (reward.type === 'attack') {
     player.attack += reward.value
-    return `공격력이 ${reward.value} 올랐다.`
+    return '공격 패턴을 하나씩 복기했다. 다음 공격이 더 정확해질 것이다.'
   }
 
   if (reward.type === 'defense') {
     player.defense += reward.value
-    return `방어력이 ${reward.value} 올랐다.`
+    return '맞아 본 순간을 되짚으며 방어 자세를 연마했다.'
   }
 
   player.relics.push(reward.value)
-  return `${reward.value} 유물을 획득했다.`
+  return '유물을 집어 들고 기운을 맞췄다.'
 }

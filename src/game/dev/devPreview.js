@@ -1,5 +1,5 @@
 import { roomTypes } from '../data/roomTypes'
-import { createEnemy } from '../data/enemies'
+import { createBossEnemy, createEnemy } from '../data/enemies'
 import { createEventNarrative } from '../systems/eventSystem'
 import {
   createBodySelectNarrative,
@@ -103,10 +103,11 @@ export function applyDevPreview(scene, screenId) {
       scene.currentRoom = DEV_MOCK_ROOM
       scene.currentEnemy = createDevEnemy(scene)
       showDevEnemy(scene)
-      scene.currentNarrative = scene.createBattleNarrative([
+      scene.setCombatLog([
         '동굴 늑대가 낮은 울음을 낸다.',
         '당신은 무기 손잡이를 고쳐 쥔다.',
       ])
+      scene.currentNarrative = scene.createBattleNarrative()
       break
 
     case 'combat-skills':
@@ -115,7 +116,15 @@ export function applyDevPreview(scene, screenId) {
       scene.currentEnemy = createDevEnemy(scene)
       showDevEnemy(scene)
       scene.player.mp = Math.max(scene.player.mp, 4)
-      scene.currentNarrative = scene.createSkillNarrative()
+      scene.setCombatLog([
+        '동굴 늑대가 낮은 울음을 낸다.',
+        '스킬 패널 미리보기.',
+      ])
+      scene.currentNarrative = scene.createBattleNarrative()
+      scene.currentNarrative = {
+        ...scene.currentNarrative,
+        combatMeta: { ...scene.currentNarrative.combatMeta, openSkillPanel: true },
+      }
       break
 
     case 'victory':
@@ -131,16 +140,44 @@ export function applyDevPreview(scene, screenId) {
       ])
       break
 
+    case 'victory-relic':
+      ensureDevRunActive(scene)
+      scene.currentRoom = DEV_MOCK_ROOM
+      scene.currentEnemy = createDevEnemy(scene)
+      scene.player.relics = []
+      scene.enemySprite.setVisible(false)
+      scene.intentIndicator.setVisible(false)
+      scene.currentNarrative = scene.createVictoryNarrative(
+        [
+          '경험치 +12',
+          '골드 14을 얻었다.',
+          '영혼의 흔적 1개를 얻었다.',
+        ],
+        'broken-clock',
+      )
+      break
+
+    case 'victory-boss-relic':
+      ensureDevRunActive(scene)
+      scene.currentRoom = DEV_MOCK_ROOM
+      scene.currentEnemy = createBossEnemy({ bossId: 'corpse-butcher', difficulty: {} })
+      scene.player.relics = []
+      scene.enemySprite.setVisible(false)
+      scene.intentIndicator.setVisible(false)
+      scene.currentNarrative = scene.createVictoryNarrative([
+        '경험치 +28',
+        '골드 32을 얻었다.',
+        '영혼의 흔적 4개를 얻었다.',
+      ])
+      break
+
     case 'level-up':
       ensureDevRunActive(scene)
       scene.currentRoom = DEV_MOCK_ROOM
       scene.currentEnemy = null
       scene.enemySprite.setVisible(false)
       scene.intentIndicator.setVisible(false)
-      scene.currentNarrative = scene.createLevelUpNarrative(
-        { gained: 12, newLevel: 2, leveledUp: true },
-        ['경험치 +12'],
-      )
+      scene.currentNarrative = scene.createLevelUpNarrative({ gained: 12, newLevel: 2, leveledUp: true })
       break
 
     case 'death':
