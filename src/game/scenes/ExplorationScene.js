@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../constants'
+import { getBackgroundDefinition, resolveBackgroundKey } from '../data/backgrounds'
 import { getFloorByIndex, isFinalFloor } from '../data/floors'
 import { createBossEnemy, createEnemy } from '../data/enemies'
 import {
@@ -27,6 +28,7 @@ import {
 } from '../systems/runState'
 import { loadPersistentState, savePersistentState, settleRun } from '../systems/saveSystem'
 import { buyShopItem, createShopInventory, createShopNarrative, createShopScreenNarrative } from '../systems/shopSystem'
+import { applyDevPreview, exitDevPreview } from '../dev/devPreview'
 import { createRoomOptions } from '../systems/roomGenerator'
 import { getRelicById } from '../systems/relicSystem'
 import {
@@ -79,18 +81,21 @@ export class ExplorationScene extends Phaser.Scene {
     this.currentShopInventory = null
 
     this.createWorld()
-    this.createHud()
     this.setupChoiceInput()
+    this.setupDevTools()
     this.updateHud()
     this.publishNarrative()
   }
 
   createWorld() {
+    const initialBackgroundKey =
+      this.currentNarrative?.layout === 'lobby-main' ? 'background-lobby' : this.currentFloor.backgroundKey
     this.background = this.add
-      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, this.currentFloor.backgroundKey)
+      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, resolveBackgroundKey(initialBackgroundKey))
       .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+      .setDepth(0)
 
-    this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.18).setOrigin(0)
+    this.sceneDimmer = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.18).setOrigin(0).setDepth(1)
 
     this.enemySprite = this.add.image(LAYOUT.enemyX, LAYOUT.enemyY, 'enemy-wolf').setOrigin(0.5, 1)
     this.enemySprite.setScale(LAYOUT.enemyScale).setVisible(false).setDepth(7)
@@ -103,15 +108,35 @@ export class ExplorationScene extends Phaser.Scene {
       .setDepth(20)
   }
 
-  createHud() {
-    this.depthText = this.add
-      .text(18, 18, this.currentFloor.name, {
-        color: '#f7efe0',
-        fontFamily: 'system-ui, Segoe UI, sans-serif',
-        fontSize: '20px',
-        fontStyle: '700',
-      })
-      .setDepth(5)
+  applySceneBackground(backgroundKey, { lobby = false } = {}) {
+    if (!this.background) {
+      return
+    }
+
+    if (lobby) {
+      if (this.textures.exists('background-lobby')) {
+        this.background.setTexture('background-lobby').setDisplaySize(GAME_WIDTH, GAME_HEIGHT).clearTint()
+      }
+      this.sceneDimmer?.setVisible(false)
+      return
+    }
+
+    const textureKey = resolveBackgroundKey(backgroundKey)
+    if (this.textures.exists(textureKey)) {
+      this.background.setTexture(textureKey).setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+    }
+
+    const tone = getBackgroundDefinition(textureKey).explorationTone
+    if (tone?.tint) {
+      this.background.setTint(tone.tint)
+    } else {
+      this.background.clearTint()
+    }
+
+    this.sceneDimmer?.setVisible(true)
+    if (tone?.dimAlpha != null) {
+      this.sceneDimmer?.setAlpha(tone.dimAlpha)
+    }
   }
 
   createIntentIndicator() {
@@ -253,6 +278,36 @@ export class ExplorationScene extends Phaser.Scene {
     window.addEventListener('game:choice', this.handleChoiceEvent)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener('game:choice', this.handleChoiceEvent)
+    })
+  }
+
+  setupDevTools() {
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    this.devPreviewActive = false
+    this.devUiVisible = true
+
+    this.handleDevPreview = (event) => {
+      applyDevPreview(this, event.detail?.screenId)
+    }
+    this.handleDevExitPreview = () => {
+      exitDevPreview(this)
+    }
+    this.handleDevToggleUi = () => {
+      this.devUiVisible = !this.devUiVisible
+      this.setUiVisibility(this.devUiVisible)
+    }
+
+    window.addEventListener('game:dev-preview', this.handleDevPreview)
+    window.addEventListener('game:dev-exit-preview', this.handleDevExitPreview)
+    window.addEventListener('game:dev-toggle-ui', this.handleDevToggleUi)
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.removeEventListener('game:dev-preview', this.handleDevPreview)
+      window.removeEventListener('game:dev-exit-preview', this.handleDevExitPreview)
+      window.removeEventListener('game:dev-toggle-ui', this.handleDevToggleUi)
     })
   }
 
@@ -566,7 +621,25 @@ export class ExplorationScene extends Phaser.Scene {
     }
   }
 
+  syncLobbyBackground() {
+    if (!this.background) {
+      return
+    }
+
+    const inLobby = this.currentNarrative?.layout === 'lobby-main'
+    this.overlay?.setAlpha(0)
+
+    if (inLobby) {
+      this.applySceneBackground('background-lobby', { lobby: true })
+      return
+    }
+
+    const backgroundKey = this.currentRoom?.backgroundKey ?? this.currentFloor.backgroundKey
+    this.applySceneBackground(backgroundKey)
+  }
+
   publishNarrative() {
+    this.syncLobbyBackground()
     this.syncCombatPresentation()
     if (this.currentNarrative?.layout === 'combat' && this.currentEnemy) {
       this.currentNarrative = {
@@ -746,6 +819,10 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   selectChoice(option) {
+    if (this.devPreviewActive) {
+      return
+    }
+
     if (this.isTransitioning) {
       return
     }
@@ -1051,8 +1128,7 @@ export class ExplorationScene extends Phaser.Scene {
     this.enemySprite.setVisible(false)
     this.intentIndicator.setVisible(false)
     this.enemyBattleHud.setVisible(false)
-    this.background.setTexture(this.currentFloor.backgroundKey)
-    this.depthText.setText(this.currentFloor.name)
+    this.applySceneBackground(this.currentFloor.backgroundKey)
     this.updateHud()
     this.currentNarrative = {
       ...createLobbyNarrative(this.runState, this.persistentState),
@@ -1308,13 +1384,11 @@ export class ExplorationScene extends Phaser.Scene {
     this.currentFloor = getFloorByIndex(this.runState.floorIndex)
     this.roomOptions = createRoomOptions(this.runState)
 
-    this.background.setTexture(room.backgroundKey)
+    this.applySceneBackground(room.backgroundKey)
     this.background.setScale(1)
     this.enemySprite.setVisible(false)
     this.intentIndicator.setVisible(false)
     this.enemyBattleHud.setVisible(false)
-
-    this.depthText.setText(this.currentFloor.name)
     if (room.type === 'mystery') {
       this.runState.hasStealthApproach = true
     }

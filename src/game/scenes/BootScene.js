@@ -1,16 +1,18 @@
 import Phaser from 'phaser'
-import { GAME_HEIGHT, GAME_WIDTH } from '../constants'
-
+import { getBackgroundTextureKeysToPreload, getBackgroundDefinition } from '../data/backgrounds'
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene')
   }
 
+  preload() {
+    getBackgroundTextureKeysToPreload().forEach((key) => {
+      const definition = getBackgroundDefinition(key)
+      this.load.image(key, definition.url)
+    })
+  }
+
   create() {
-    this.createBackgroundTexture('background-forest', 0x172417, 0x2c4b34, 0x7d8f59)
-    this.createBackgroundTexture('background-ruins', 0x181923, 0x4a3d49, 0xb58b5b)
-    this.createBackgroundTexture('background-mist', 0x101720, 0x334153, 0x9db1c0)
-    this.createBackgroundTexture('background-camp', 0x1d1712, 0x50351f, 0xe3a857)
     this.createEnemyTexture('enemy-wolf', 0x2a3140, 0x8ba0b8)
     this.createEnemyTexture('enemy-imp', 0x4a1f1b, 0xff8a3d)
     this.createEnemyTexture('enemy-rat', 0x2d2630, 0xd9d0ba)
@@ -22,28 +24,6 @@ export class BootScene extends Phaser.Scene {
     this.createEnemyTexture('enemy-hound', 0x241d22, 0xff8a3d)
     this.createIntentTextures()
     this.scene.start('ExplorationScene')
-  }
-
-  createBackgroundTexture(key, skyColor, groundColor, accentColor) {
-    const graphics = this.add.graphics()
-
-    graphics.fillStyle(skyColor, 1)
-    graphics.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT)
-    graphics.fillStyle(groundColor, 1)
-    graphics.fillRect(0, GAME_HEIGHT * 0.45, GAME_WIDTH, GAME_HEIGHT * 0.55)
-
-    for (let i = 0; i < 5; i += 1) {
-      const x = -40 + i * 118
-      const baseY = GAME_HEIGHT * 0.48
-      const height = Phaser.Math.Between(120, 230)
-      graphics.fillStyle(accentColor, 0.22)
-      graphics.fillTriangle(x - 110, baseY, x, baseY - height, x + 110, baseY)
-    }
-
-    graphics.fillStyle(0x05070c, 0.36)
-    graphics.fillRect(0, GAME_HEIGHT * 0.64, GAME_WIDTH, GAME_HEIGHT * 0.36)
-    graphics.generateTexture(key, GAME_WIDTH, GAME_HEIGHT)
-    graphics.destroy()
   }
 
   createEnemyTexture(key, bodyColor, accentColor) {

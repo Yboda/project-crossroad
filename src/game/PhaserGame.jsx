@@ -19,6 +19,8 @@ import {
 } from 'lucide-react'
 import { createGameConfig } from './config'
 import { initGameScrollReveal } from './scrollReveal'
+import lobbyBackgroundUrl from '../assets/backgrounds/loby2.jpg'
+import { DevToolsPanel } from './dev/DevToolsPanel'
 
 const LOBBY_LAYOUTS = new Set(['lobby-main', 'body-select', 'soul-nodes'])
 const FULLSCREEN_LAYOUTS = new Set(['combat', 'victory', 'death', 'level-up', 'shop-entry', 'shop'])
@@ -67,6 +69,15 @@ export function PhaserGame() {
     if (!runStatus?.isBodySelected) setIsStatusOpen(false)
   }, [runStatus?.isBodySelected])
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined
+    const handleDevUi = (event) => {
+      if (event.detail?.characterModal) setIsStatusOpen(true)
+    }
+    window.addEventListener('game:dev-ui', handleDevUi)
+    return () => window.removeEventListener('game:dev-ui', handleDevUi)
+  }, [])
+
   const handleChoice = (optionId) => {
     window.dispatchEvent(new CustomEvent('game:choice', { detail: { optionId } }))
   }
@@ -77,9 +88,15 @@ export function PhaserGame() {
     !LOBBY_LAYOUTS.has(narrative.layout) &&
     !FULLSCREEN_LAYOUTS.has(narrative.layout)
 
+  const hidePhaserCanvas = !narrative || narrative.layout === 'lobby-main'
+
   return (
     <section className="game-frame" ref={frameRef} aria-label="Game canvas">
-      <div className="game-canvas" ref={containerRef} />
+      <div
+        className="game-canvas"
+        ref={containerRef}
+        style={{ visibility: hidePhaserCanvas ? 'hidden' : 'visible' }}
+      />
       {showTopHud ? <TopHUD status={runStatus} onOpen={() => setIsStatusOpen(true)} /> : null}
       <StoryPanel
         frameRef={frameRef}
@@ -92,6 +109,7 @@ export function PhaserGame() {
       {isStatusOpen && frameRef.current ? (
         <CharacterInfoModal container={frameRef.current} status={runStatus} onClose={() => setIsStatusOpen(false)} />
       ) : null}
+      <DevToolsPanel />
     </section>
   )
 }
@@ -655,7 +673,8 @@ function LobbyMain({ narrative, isVisible, onChoice, hidden }) {
   return (
     <aside className={`lobby-screen-new ${hidden}`}>
       <div className="lobby-bg-overlay">
-        <div className="lobby-bg-img" />
+        <img className="lobby-bg-photo" src={lobbyBackgroundUrl} alt="" />
+        <div className="lobby-bg-vignette" aria-hidden="true" />
       </div>
       <div className="lobby-topbar-new">
         <div className="lobby-topbar-resource">
@@ -671,6 +690,20 @@ function LobbyMain({ narrative, isVisible, onChoice, hidden }) {
         <span className="lobby-eyebrow-new">Corpse Chamber</span>
         <h1 className="lobby-title-new">{narrative.title}</h1>
         <div className="lobby-divider" />
+        {narrative.story?.length ? (
+          <div className="lobby-story game-scroll">
+            {narrative.story.map((line, index) => (
+              <p
+                key={`${narrative.id}-story-${index}`}
+                className={
+                  index === 0 ? 'lobby-story-main' : index === 1 ? 'lobby-story-sub' : 'lobby-story-extra'
+                }
+              >
+                {line}
+              </p>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="lobby-bottom-actions">
         <div className="lobby-body-display">
