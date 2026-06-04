@@ -200,13 +200,6 @@ export function createRewardOptions(player) {
 
   return [
     {
-      id: 'reward-max-hp',
-      label: '최대 체력 +5',
-      detail: '즉시 체력도 5 회복한다.',
-      type: 'reward',
-      reward: { type: 'maxHp', value: 5 },
-    },
-    {
       id: 'reward-attack',
       label: '공격력 +1',
       detail: '모든 공격 피해가 오른다.',
@@ -221,6 +214,13 @@ export function createRewardOptions(player) {
       reward: hasThornRelic
         ? { type: 'defense', value: 1 }
         : { type: 'relic', value: 'black-thorn' },
+    },
+    {
+      id: 'reward-max-hp',
+      label: '최대 HP +5',
+      detail: '최대 HP +5',
+      type: 'reward',
+      reward: { type: 'maxHp', value: 5 },
     },
   ]
 }

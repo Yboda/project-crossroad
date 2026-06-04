@@ -9,7 +9,7 @@ export function createEventNarrative(eventId, player) {
   const event = getEventById(eventId)
   return {
     id: `event-${event.id}`,
-    title: event.title,
+    layout: 'exploration',
     story: event.story,
     prompt: '당신은,',
     options: event.options.map((option) => ({

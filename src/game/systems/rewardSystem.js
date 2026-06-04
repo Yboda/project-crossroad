@@ -1,27 +1,33 @@
 import { rewardTable } from '../data/rewards'
+import { sortStatChoiceOptions } from '../utils/sortStatChoices'
 import { getRelicById } from './relicSystem'
 import { addRunReward } from './runState'
 
 export function createRewardOptions(player, enemy) {
-  const options = rewardTable
-    .filter((reward) => reward.type !== 'relic' || !player.relics.includes(reward.value))
-    .slice(0, 3)
-    .map((reward) => ({
-      id: `reward-${reward.type}-${reward.value}`,
-      label: reward.label,
-      detail: reward.detail,
-      type: 'reward',
-      reward,
-    }))
+  const options = sortStatChoiceOptions(
+    rewardTable
+      .filter((reward) => reward.type !== 'relic' || !player.relics.includes(reward.value))
+      .slice(0, 3)
+      .map((reward) => ({
+        id: `reward-${reward.type}-${reward.value}`,
+        label: reward.label,
+        detail: reward.detail,
+        type: 'reward',
+        reward,
+      })),
+  )
 
   if (enemy?.isBoss) {
-    options[0] = {
-      id: 'reward-boss-memory',
-      label: '보스의 영혼 흔적',
-      detail: '영혼의 흔적 6개와 많은 골드를 얻는다.',
-      type: 'reward',
-      reward: { type: 'boss-cache', value: 6 },
-    }
+    return [
+      {
+        id: 'reward-boss-memory',
+        label: '보스의 영혼 흔적',
+        detail: '영혼의 흔적 6개와 많은 골드를 얻는다.',
+        type: 'reward',
+        reward: { type: 'boss-cache', value: 6 },
+      },
+      ...options,
+    ]
   }
 
   return options

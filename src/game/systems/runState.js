@@ -1,4 +1,5 @@
 import { createBodyCandidates } from './bodyGenerator'
+import { createExperienceState, resetExperience } from './experienceSystem'
 import { applySoulBonuses, createDefaultPersistentState } from './soulEngravingSystem'
 
 export function createInitialRunState(persistentState = createDefaultPersistentState()) {
@@ -23,12 +24,14 @@ export function createInitialRunState(persistentState = createDefaultPersistentS
     currentBody: null,
     bodyCandidates: bodies,
     player,
+    ...createExperienceState(),
   }
 }
 
 export function selectRunBody(runState, body, persistentState) {
   runState.currentBody = body
   runState.player = applySoulBonuses({ ...body.stats, block: 0, relics: [], skills: [...body.skills] }, persistentState)
+  resetExperience(runState)
 }
 
 export function advanceRunDepth(runState) {

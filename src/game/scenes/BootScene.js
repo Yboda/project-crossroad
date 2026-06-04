@@ -11,7 +11,6 @@ export class BootScene extends Phaser.Scene {
     this.createBackgroundTexture('background-ruins', 0x181923, 0x4a3d49, 0xb58b5b)
     this.createBackgroundTexture('background-mist', 0x101720, 0x334153, 0x9db1c0)
     this.createBackgroundTexture('background-camp', 0x1d1712, 0x50351f, 0xe3a857)
-    this.createHeroTexture()
     this.createEnemyTexture('enemy-wolf', 0x2a3140, 0x8ba0b8)
     this.createEnemyTexture('enemy-imp', 0x4a1f1b, 0xff8a3d)
     this.createEnemyTexture('enemy-rat', 0x2d2630, 0xd9d0ba)
@@ -44,24 +43,6 @@ export class BootScene extends Phaser.Scene {
     graphics.fillStyle(0x05070c, 0.36)
     graphics.fillRect(0, GAME_HEIGHT * 0.64, GAME_WIDTH, GAME_HEIGHT * 0.36)
     graphics.generateTexture(key, GAME_WIDTH, GAME_HEIGHT)
-    graphics.destroy()
-  }
-
-  createHeroTexture() {
-    const graphics = this.add.graphics()
-
-    graphics.fillStyle(0x1c2232, 1)
-    graphics.fillRoundedRect(26, 46, 68, 112, 30)
-    graphics.fillStyle(0x26314b, 1)
-    graphics.fillRoundedRect(36, 18, 48, 54, 24)
-    graphics.fillStyle(0x131723, 1)
-    graphics.fillRoundedRect(18, 78, 30, 82, 14)
-    graphics.fillRoundedRect(72, 78, 30, 82, 14)
-    graphics.fillStyle(0xd8a657, 1)
-    graphics.fillTriangle(60, 24, 40, 72, 80, 72)
-    graphics.lineStyle(5, 0xf7efe0, 0.45)
-    graphics.strokeRoundedRect(28, 48, 64, 108, 28)
-    graphics.generateTexture('hero-back', 120, 170)
     graphics.destroy()
   }
 

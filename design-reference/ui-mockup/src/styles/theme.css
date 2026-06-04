@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@theme {
+  --font-serif: "Noto Serif KR", serif;
+  --font-sans: "Noto Sans KR", sans-serif;
+
+  --color-dark-bg: #0a0a0c;
+  --color-dark-panel: rgba(18, 18, 21, 0.85);
+  --color-gold: #c1a35f;
+  --color-gold-dim: #8b6d3b;
+  --color-text-main: #e4e4e5;
+  --color-text-muted: #919198;
+  --color-soul: #7fd4ff;
+  --color-soul-dim: #2a566a;
+  --color-blood: #8b2020;
+}
+
+body {
+  @apply bg-[#050505] text-text-main font-sans overflow-hidden antialiased;
+}
+
+/* Custom scrollbar for webkit */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-gold-dim);
+  border-radius: 4px;
+}
+
+.gothic-border {
+  border: 1px solid var(--color-gold-dim);
+  box-shadow:
+    inset 0 0 10px rgba(0, 0, 0, 0.5),
+    0 0 5px rgba(193, 163, 95, 0.1);
+}
+
+.gothic-panel {
+  background-color: var(--color-dark-panel);
+  backdrop-filter: blur(
+    12px
+  ); /* backdrop-blur-md 대용 순수 CSS */
+
+  /* gothic-border의 내용을 직접 삽입 */
+  border: 1px solid var(--color-gold-dim);
+  box-shadow:
+    inset 0 0 10px rgba(0, 0, 0, 0.5),
+    0 0 5px rgba(193, 163, 95, 0.1);
+}
+
+.text-gothic {
+  @apply font-serif text-gold drop-shadow-md;
+}
+
+.bg-radial-candle {
+  background: radial-gradient(
+    circle at center,
+    rgba(193, 163, 95, 0.15) 0%,
+    rgba(10, 10, 12, 0.9) 70%,
+    #0a0a0c 100%
+  );
+}

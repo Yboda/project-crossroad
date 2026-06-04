@@ -28,13 +28,20 @@ export function createLobbyNarrative(runState, persistentState) {
         label: runState.currentBody ? '육체를 다시 고른다.' : '육체를 고른다.',
         detail: '이번 여정에 사용할 육체를 선택한다.',
         type: 'open-body-select',
-        variant: 'primary',
       },
       {
         id: 'open-soul-nodes',
         label: '영혼의 흔적을 새긴다.',
         detail: '영혼의 능력을 해금한다.',
         type: 'open-soul-nodes',
+      },
+      {
+        id: 'start-run',
+        label: '탐험을 시작한다.',
+        detail: runState.currentBody ? `${runState.currentBody.name}으로 미궁에 들어선다.` : '육체를 먼저 선택해야 합니다.',
+        type: 'continue-run',
+        locked: !runState.currentBody,
+        variant: 'primary',
       },
     ],
   }
@@ -59,16 +66,22 @@ export function createBodySelectNarrative(runState) {
         body,
       })),
       {
-        id: 'start-selected-run',
-        label: '미궁으로 나아간다.',
-        detail: runState.currentBody ? `${runState.currentBody.name}으로 시작한다.` : '육체를 선택하면 활성화된다.',
-        type: 'continue-run',
+        id: 'confirm-body-select',
+        label: '이 그릇을 취한다.',
+        detail: runState.currentBody ? `${runState.currentBody.name}을(를) 선택한다.` : '육체를 선택하면 활성화된다.',
+        type: 'back-to-lobby',
         locked: !runState.currentBody,
         variant: 'primary',
       },
-      { id: 'back-to-lobby', label: '로비로 돌아간다.', detail: '시체더미의 방으로 돌아간다.', type: 'back-to-lobby' },
+      { id: 'back-to-lobby', label: '돌아가기', detail: '시체더미의 방으로 돌아간다.', type: 'back-to-lobby' },
     ],
   }
+}
+
+function getUnmetRequirementLabels(node, persistentState) {
+  return (node.requires ?? [])
+    .filter((requiredId) => !persistentState.unlockedSoulNodes.includes(requiredId))
+    .map((requiredId) => getNodeLabel(requiredId))
 }
 
 export function createSoulNodeNarrative(persistentState) {
@@ -76,6 +89,7 @@ export function createSoulNodeNarrative(persistentState) {
     id: `soul-nodes-${persistentState.memoryShards}`,
     layout: 'soul-nodes',
     title: '영혼 각인',
+    memoryShards: persistentState.memoryShards,
     story: [
       // '영혼의 흔적은 능력치가 아니라, 잊어버린 자신을 영혼에 다시 새기는 재료다.',
       // '각인은 육체별 성장이 아니라 모든 여정과 모든 육체에 공통으로 적용되는 영구 성장이다.',
@@ -97,6 +111,8 @@ export function createSoulNodeNarrative(persistentState) {
         unlocked: persistentState.unlockedSoulNodes.includes(node.id),
         requirements: node.requires ?? [],
         requirementLabels: (node.requires ?? []).map((requiredId) => getNodeLabel(requiredId)),
+        unmetRequirementLabels: getUnmetRequirementLabels(node, persistentState),
+        canAfford: persistentState.memoryShards >= node.cost,
         route: node.route,
         position: node.position,
         type: 'unlock-soul-node',
