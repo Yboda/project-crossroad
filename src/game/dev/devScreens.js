@@ -51,3 +51,12 @@ export const DEV_SCREEN_GROUPS = [
 export const DEV_SCREEN_IDS = DEV_SCREEN_GROUPS.flatMap((group) =>
   group.screens.map((screen) => screen.id),
 )
+
+/** 전투 미리보기에서 적 선택이 의미 있는 화면 */
+export const DEV_COMBAT_SCREEN_IDS = new Set([
+  'combat',
+  'combat-skills',
+  'victory',
+  'victory-relic',
+  'victory-boss-relic',
+])

@@ -30,12 +30,17 @@ import { getRelicById } from './systems/relicSystem'
 import lobbyBackgroundUrl from '../assets/backgrounds/lobby-1.png'
 import deathBackgroundUrl from '../assets/backgrounds/death.jpg'
 import { DevToolsPanel } from './dev/DevToolsPanel'
+import { useDevSettings } from './dev/useDevSettings'
 import {
   getEnemyPortraitBackgroundClass,
   getEnemyPortraitToneStyle,
 } from './data/backgrounds'
 import { getCharacterImageSrc } from './data/characterAssets'
-import { getEnemyImageSrc } from './data/enemyAssets'
+import {
+  getEnemyFigureLayoutStyle,
+  getEnemyImageSrc,
+  getEnemyPortraitOverrideStyle,
+} from './data/enemyAssets'
 import { getRelicImageSrc } from './data/relicAssets'
 import {
   getStoryEmphasisClass,
@@ -114,9 +119,20 @@ export function PhaserGame() {
     !FULLSCREEN_LAYOUTS.has(narrative.layout)
 
   const hidePhaserCanvas = !narrative || narrative.layout === 'lobby-main'
+  const devSettings = useDevSettings()
+  const devFrameClasses = [
+    devSettings.disableScreenGradient ? 'dev-no-screen-gradient' : '',
+    devSettings.disableEnemyPortraitEffects ? 'dev-no-enemy-portrait-fx' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <section className="game-frame" ref={frameRef} aria-label="Game canvas">
+    <section
+      className={`game-frame${devFrameClasses ? ` ${devFrameClasses}` : ''}`}
+      ref={frameRef}
+      aria-label="Game canvas"
+    >
       <div
         className="game-canvas"
         ref={containerRef}
@@ -323,6 +339,7 @@ function EnemyPortrait({ enemyId, motionCue = null, className = '' }) {
   const reduceMotion = useReducedMotion()
   const controls = useAnimation()
   const imageSrc = getEnemyImageSrc(enemyId)
+  const portraitOverrideStyle = getEnemyPortraitOverrideStyle(enemyId)
 
   useEffect(() => {
     if (reduceMotion) return undefined
@@ -345,9 +362,9 @@ function EnemyPortrait({ enemyId, motionCue = null, className = '' }) {
 
   return (
     <motion.div
-      className={`combat-enemy-portrait combat-enemy-image-portrait ${className}`}
+      className={`combat-enemy-portrait combat-enemy-image-portrait${enemyId ? ` combat-enemy-id--${enemyId}` : ''} ${className}`}
       aria-hidden="true"
-      style={{ transformOrigin: 'bottom center' }}
+      style={{ transformOrigin: 'bottom center', ...portraitOverrideStyle }}
       animate={reduceMotion ? false : controls}
     >
       <img src={imageSrc} alt="" draggable={false} />
@@ -616,6 +633,7 @@ function CombatScreen({ narrative, isVisible, onChoice, runStatus, hidden }) {
 
   const enemyBackgroundClass = getEnemyPortraitBackgroundClass(narrative.backgroundKey)
   const enemyToneStyle = getEnemyPortraitToneStyle(narrative.backgroundKey)
+  const enemyFigureLayoutStyle = getEnemyFigureLayoutStyle(meta.enemyId)
   const { enemyMotionCue, screenEffect, isShaking } = useCombatMotion(reduceMotion)
 
   const screenEffectClass = screenEffect
@@ -633,20 +651,22 @@ function CombatScreen({ narrative, isVisible, onChoice, runStatus, hidden }) {
         style={enemyToneStyle}
         aria-label={meta.enemyName}
       >
-        <div className="combat-intent-gap" aria-hidden="true" />
-        <EnemyPortrait enemyId={meta.enemyId} motionCue={enemyMotionCue} />
-        <div className="combat-enemy-info">
-          <strong>{meta.enemyName}</strong>
-          <small>{meta.enemyKind}</small>
-        </div>
-        <div className="combat-enemy-hp-block">
-          <div className="combat-enemy-hp-row">
-            <BlockShieldBadge value={meta.enemyBlock ?? 0} />
-            <div className="combat-enemy-hp-bar-col">
-              <StatBar value={meta.enemyHp} max={meta.enemyMaxHp || 1} colorClass="hp" />
-              <span className="combat-enemy-hp-text">
-                {`${meta.enemyHp} / ${meta.enemyMaxHp}`}
-              </span>
+        <div className="combat-enemy-figure" style={enemyFigureLayoutStyle}>
+          <div className="combat-intent-gap" aria-hidden="true" />
+          <EnemyPortrait enemyId={meta.enemyId} motionCue={enemyMotionCue} />
+          <div className="combat-enemy-info">
+            <strong>{meta.enemyName}</strong>
+            <small>{meta.enemyKind}</small>
+          </div>
+          <div className="combat-enemy-hp-block">
+            <div className="combat-enemy-hp-row">
+              <BlockShieldBadge value={meta.enemyBlock ?? 0} />
+              <div className="combat-enemy-hp-bar-col">
+                <StatBar value={meta.enemyHp} max={meta.enemyMaxHp || 1} colorClass="hp" />
+                <span className="combat-enemy-hp-text">
+                  {`${meta.enemyHp} / ${meta.enemyMaxHp}`}
+                </span>
+              </div>
             </div>
           </div>
         </div>

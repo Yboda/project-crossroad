@@ -1,5 +1,5 @@
 import { roomTypes } from '../data/roomTypes'
-import { createBossEnemy, createEnemy } from '../data/enemies'
+import { bossTemplates, createBossEnemy, createEnemy } from '../data/enemies'
 import { createEventNarrative } from '../systems/eventSystem'
 import {
   createBodySelectNarrative,
@@ -19,10 +19,16 @@ const DEV_MOCK_ROOM = {
   prompt: roomTypes.battle.prompt,
 }
 
-export function applyDevPreview(scene, screenId) {
+export function applyDevPreview(scene, screenId, options = {}) {
   scene.devPreviewActive = true
   scene.isTransitioning = false
   scene.overlay?.setAlpha(0)
+
+  if (options.enemyId) {
+    scene.devPreviewEnemyId = options.enemyId
+  } else if (!scene.devPreviewEnemyId) {
+    scene.devPreviewEnemyId = 'starving-wolf'
+  }
 
   switch (screenId) {
     case 'lobby-main':
@@ -99,76 +105,23 @@ export function applyDevPreview(scene, screenId) {
       break
 
     case 'combat':
-      ensureDevRunActive(scene)
-      scene.currentRoom = DEV_MOCK_ROOM
-      scene.currentEnemy = createDevEnemy(scene)
-      showDevEnemy(scene)
-      scene.setCombatLog([
-        '동굴 늑대가 낮은 울음을 낸다.',
-        '당신은 무기 손잡이를 고쳐 쥔다.',
-      ])
-      scene.currentNarrative = scene.createBattleNarrative()
+      applyDevCombatPreview(scene, { openSkillPanel: false })
       break
 
     case 'combat-skills':
-      ensureDevRunActive(scene)
-      scene.currentRoom = DEV_MOCK_ROOM
-      scene.currentEnemy = createDevEnemy(scene)
-      showDevEnemy(scene)
-      scene.player.mp = Math.max(scene.player.mp, 4)
-      scene.setCombatLog([
-        '동굴 늑대가 낮은 울음을 낸다.',
-        '스킬 패널 미리보기.',
-      ])
-      scene.currentNarrative = scene.createBattleNarrative()
-      scene.currentNarrative = {
-        ...scene.currentNarrative,
-        combatMeta: { ...scene.currentNarrative.combatMeta, openSkillPanel: true },
-      }
+      applyDevCombatPreview(scene, { openSkillPanel: true })
       break
 
     case 'victory':
-      ensureDevRunActive(scene)
-      scene.currentRoom = DEV_MOCK_ROOM
-      scene.currentEnemy = createDevEnemy(scene)
-      scene.enemySprite.setVisible(false)
-      scene.intentIndicator.setVisible(false)
-      scene.currentNarrative = scene.createVictoryNarrative([
-        '경험치 +12',
-        '골드 14을 얻었다.',
-        '영혼의 흔적 1개를 얻었다.',
-      ])
+      applyDevVictoryPreview(scene, { withRelic: false })
       break
 
     case 'victory-relic':
-      ensureDevRunActive(scene)
-      scene.currentRoom = DEV_MOCK_ROOM
-      scene.currentEnemy = createDevEnemy(scene)
-      scene.player.relics = []
-      scene.enemySprite.setVisible(false)
-      scene.intentIndicator.setVisible(false)
-      scene.currentNarrative = scene.createVictoryNarrative(
-        [
-          '경험치 +12',
-          '골드 14을 얻었다.',
-          '영혼의 흔적 1개를 얻었다.',
-        ],
-        'broken-clock',
-      )
+      applyDevVictoryPreview(scene, { withRelic: true, relicId: 'broken-clock' })
       break
 
     case 'victory-boss-relic':
-      ensureDevRunActive(scene)
-      scene.currentRoom = DEV_MOCK_ROOM
-      scene.currentEnemy = createBossEnemy({ bossId: 'corpse-butcher', difficulty: {} })
-      scene.player.relics = []
-      scene.enemySprite.setVisible(false)
-      scene.intentIndicator.setVisible(false)
-      scene.currentNarrative = scene.createVictoryNarrative([
-        '경험치 +28',
-        '골드 32을 얻었다.',
-        '영혼의 흔적 4개를 얻었다.',
-      ])
+      applyDevVictoryPreview(scene, { withRelic: true, forceBoss: true })
       break
 
     case 'level-up':
@@ -221,9 +174,14 @@ export function applyDevPreview(scene, screenId) {
       return
   }
 
+  scene.syncCombatPresentation?.()
   scene.publishNarrative()
   scene.updateHud()
-  window.dispatchEvent(new CustomEvent('game:dev-preview-state', { detail: { active: true, screenId } }))
+  window.dispatchEvent(
+    new CustomEvent('game:dev-preview-state', {
+      detail: { active: true, screenId, enemyId: scene.devPreviewEnemyId },
+    }),
+  )
 }
 
 export function exitDevPreview(scene) {
@@ -251,12 +209,54 @@ function ensureDevRunActive(scene) {
   }
 }
 
-function createDevEnemy(scene) {
+function createDevEnemy(scene, enemyId = scene.devPreviewEnemyId) {
+  const id = enemyId ?? 'starving-wolf'
+  if (bossTemplates[id]) {
+    return createBossEnemy({ bossId: id, difficulty: scene.currentFloor?.difficulty ?? {} })
+  }
   return createEnemy({
-    enemyId: 'starving-wolf',
+    enemyId: id,
     totalDepth: scene.runState.totalDepth,
     difficulty: scene.currentFloor?.difficulty ?? { hp: 0, attack: 0 },
   })
+}
+
+function applyDevCombatPreview(scene, { openSkillPanel = false } = {}) {
+  ensureDevRunActive(scene)
+  scene.currentRoom = DEV_MOCK_ROOM
+  scene.currentEnemy = createDevEnemy(scene)
+  showDevEnemy(scene)
+  scene.player.mp = Math.max(scene.player.mp, openSkillPanel ? 4 : scene.player.mp)
+  scene.setCombatLog([
+    `${scene.currentEnemy.name}가 당신을 노려본다.`,
+    openSkillPanel ? '스킬 패널 미리보기.' : '당신은 무기 손잡이를 고쳐 쥔다.',
+  ])
+  scene.currentNarrative = scene.createBattleNarrative()
+  if (openSkillPanel) {
+    scene.currentNarrative = {
+      ...scene.currentNarrative,
+      combatMeta: { ...scene.currentNarrative.combatMeta, openSkillPanel: true },
+    }
+  }
+}
+
+function applyDevVictoryPreview(scene, { withRelic = false, relicId = 'broken-clock', forceBoss = false } = {}) {
+  ensureDevRunActive(scene)
+  scene.currentRoom = DEV_MOCK_ROOM
+  if (forceBoss && !bossTemplates[scene.devPreviewEnemyId]) {
+    scene.devPreviewEnemyId = 'corpse-butcher'
+  }
+  scene.currentEnemy = createDevEnemy(scene)
+  scene.player.relics = withRelic ? [] : scene.player.relics
+  scene.enemySprite.setVisible(false)
+  scene.intentIndicator.setVisible(false)
+  const isBoss = scene.currentEnemy.isBoss
+  scene.currentNarrative = scene.createVictoryNarrative(
+    isBoss
+      ? ['경험치 +28', '골드 32을 얻었다.', '영혼의 흔적 4개를 얻었다.']
+      : ['경험치 +12', '골드 14을 얻었다.', '영혼의 흔적 1개를 얻었다.'],
+    withRelic ? relicId : undefined,
+  )
 }
 
 function showDevEnemy(scene) {

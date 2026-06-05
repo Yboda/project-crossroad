@@ -11,7 +11,9 @@ import insideCorpsePit1fBackgroundUrl from '../../assets/backgrounds/1f-inside-t
  * Phaser 배경 텍스처 정의.
  * - key: Phaser texture key (층/방/화면 데이터에서 참조)
  * - url: import된 이미지
- * - explorationTone: 탐험·전투 등 게임 캔버스 위에 깔 때 색감 조정 (로비는 미적용)
+ * - explorationTone: 탐험·전투 캔버스 위 색감 조정 (로비는 미적용)
+ *   - tint: 기본 미사용. 필요한 방만 개별 지정
+ *   - dimAlpha: 검은 딤 오버레이 강도
  *
  * 나중에 방/이벤트별 이미지를 넣을 때:
  * 1. assets에 이미지 추가
@@ -25,7 +27,6 @@ export const BACKGROUND_TEXTURES = {
   'background-1f-path': {
     url: path1fBackgroundUrl,
     explorationTone: {
-      tint: 0xb8b8b8,
       dimAlpha: 0.26,
     },
     enemyPortraitTone: {
@@ -45,7 +46,6 @@ export const BACKGROUND_TEXTURES = {
   'background-boss-1f-front': {
     url: boss1FrontBackgroundUrl,
     explorationTone: {
-      tint: 0xc8c0b8,
       dimAlpha: 0.2,
     },
     enemyPortraitTone: {
@@ -62,7 +62,6 @@ export const BACKGROUND_TEXTURES = {
   'background-1f-merchant': {
     url: merchant1fBackgroundUrl,
     explorationTone: {
-      tint: 0xb8b4ac,
       dimAlpha: 0.22,
     },
     enemyPortraitTone: {
@@ -79,7 +78,6 @@ export const BACKGROUND_TEXTURES = {
   'background-1f-corpse-pit': {
     url: corpsePit1fBackgroundUrl,
     explorationTone: {
-      tint: 0xa8a4a0,
       dimAlpha: 0.24,
     },
     enemyPortraitTone: {
@@ -96,7 +94,6 @@ export const BACKGROUND_TEXTURES = {
   'background-1f-inside-corpse-pit': {
     url: insideCorpsePit1fBackgroundUrl,
     explorationTone: {
-      tint: 0x9c9894,
       dimAlpha: 0.28,
     },
     enemyPortraitTone: {
@@ -151,6 +148,25 @@ export function getBackgroundImageUrl(key) {
   return getBackgroundDefinition(key).url
 }
 
+/** DEV 미리보기용 기본 틴트 — explorationTone.tint 미지정 방에도 적용 */
+export const DEFAULT_BACKGROUND_TINT = 0xb8b8b8
+
+/**
+ * @returns {number | null} Phaser tint. null이면 틴트 없음
+ * - 프로덕션: explorationTone.tint 지정된 방만
+ * - DEV + devTintPreviewEnabled: 모든 방 (미지정 시 DEFAULT_BACKGROUND_TINT)
+ */
+export function resolveBackgroundTintForScene(backgroundKey, devTintPreviewEnabled = false) {
+  const tone = getBackgroundDefinition(backgroundKey).explorationTone
+  const configuredTint = tone?.tint ?? null
+
+  if (import.meta.env.DEV && devTintPreviewEnabled) {
+    return configuredTint ?? DEFAULT_BACKGROUND_TINT
+  }
+
+  return configuredTint
+}
+
 /** 전투 몬스터 일러스트 CSS filter — explorationTone과 짝을 맞춘 프리셋 */
 export function getEnemyPortraitTone(key) {
   const definition = getBackgroundDefinition(key)
@@ -182,34 +198,44 @@ export function getBackgroundTextureKeysToPreload() {
 }
 
 /** CSS background-size: cover — 비율 유지, 짧은 변이 화면에 맞도록 확대 */
-export function getBackgroundCoverDisplaySize(sourceWidth, sourceHeight, zoom = 1) {
+export function getBackgroundCoverScale(sourceWidth, sourceHeight, zoom = 1) {
   const safeWidth = Math.max(1, sourceWidth)
   const safeHeight = Math.max(1, sourceHeight)
-  const coverScale = Math.max(GAME_WIDTH / safeWidth, GAME_HEIGHT / safeHeight) * zoom
+  return Math.max(GAME_WIDTH / safeWidth, GAME_HEIGHT / safeHeight) * zoom
+}
 
+export function getBackgroundCoverDisplaySize(sourceWidth, sourceHeight, zoom = 1) {
+  const coverScale = getBackgroundCoverScale(sourceWidth, sourceHeight, zoom)
   return {
-    width: safeWidth * coverScale,
-    height: safeHeight * coverScale,
+    width: sourceWidth * coverScale,
+    height: sourceHeight * coverScale,
+    scale: coverScale,
   }
 }
 
 function getBackgroundSourceSize(image) {
   const frame = image.frame
+  const source = image.texture?.source?.[image.frame.sourceIndex]
+  const width = source?.width || frame.cutWidth || frame.width || 1
+  const height = source?.height || frame.cutHeight || frame.height || 1
   return {
-    width: frame.cutWidth || frame.width || 1,
-    height: frame.cutHeight || frame.height || 1,
+    width: Math.max(1, width),
+    height: Math.max(1, height),
   }
 }
 
+/**
+ * 배경을 cover로 맞춘다 — 가로·세로 동일 배율(setScale)만 사용해 늘어남 방지.
+ */
 export function applyBackgroundCover(image, zoom = 1) {
   if (!image?.frame) {
     return
   }
 
   const source = getBackgroundSourceSize(image)
-  const { width, height } = getBackgroundCoverDisplaySize(source.width, source.height, zoom)
-  image.setScale(1)
-  image.setDisplaySize(Math.ceil(width), Math.ceil(height))
+  const coverScale = getBackgroundCoverScale(source.width, source.height, zoom)
+
   image.setOrigin(0.5, 0.5)
   image.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2)
+  image.setScale(coverScale)
 }

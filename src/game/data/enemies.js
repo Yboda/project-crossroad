@@ -103,6 +103,20 @@ export const enemyTemplates = {
     ],
     rewards: { gold: [16, 24], memoryShards: [2, 3] },
   },
+  'time-manager': {
+    id: 'time-manager',
+    name: '시간관리자',
+    textureKey: 'enemy-time-manager',
+    maxHp: 40,
+    attack: 10,
+    pattern: [
+      { type: 'block', value: 9, label: '멈춘 시침' },
+      { type: 'buff', value: 3, label: '흐름 가속' },
+      { type: 'attack', value: 11, label: '되돌리기' },
+      { type: 'attack', value: 13, label: '지연된 심판' },
+    ],
+    rewards: { gold: [18, 26], memoryShards: [2, 3] },
+  },
   'soul-hound': {
     id: 'soul-hound',
     name: '영혼 사냥개',
@@ -192,6 +206,21 @@ export function createEnemy(depthOrContext) {
     turn: 0,
     isBoss: false,
   }
+}
+
+/** 개발자 도구 전투 미리보기용 적 목록 */
+export function getDevEnemyCatalog() {
+  const normals = Object.values(enemyTemplates).map((template) => ({
+    id: template.id,
+    name: template.name,
+    isBoss: false,
+  }))
+  const bosses = Object.values(bossTemplates).map((template) => ({
+    id: template.id,
+    name: `${template.name} (보스)`,
+    isBoss: true,
+  }))
+  return [...normals, ...bosses]
 }
 
 export function createBossEnemy(context) {

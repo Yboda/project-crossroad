@@ -1,6 +1,13 @@
 import Phaser from 'phaser'
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../constants'
-import { applyBackgroundCover, getBackgroundDefinition, resolveBackgroundKey } from '../data/backgrounds'
+import {
+  applyBackgroundCover,
+  getBackgroundDefinition,
+  resolveBackgroundKey,
+  resolveBackgroundTintForScene,
+} from '../data/backgrounds'
+import { getEnemyPortraitLayoutOffset } from '../data/enemyAssets'
+import { isDevBackgroundDimDisabled, isDevBackgroundTintEnabled } from '../dev/devSettings'
 import { getFloorByIndex, isFinalFloor } from '../data/floors'
 import { createBossEnemy, createEnemy } from '../data/enemies'
 import {
@@ -78,9 +85,9 @@ const LAYOUT = {
 /** React 전투 UI 오버레이와 맞춘 적/의도 표시 위치 (게임 좌표 = 390×844) */
 const COMBAT_LAYOUT = {
   portraitX: GAME_WIDTH / 2,
-  portraitY: 560,
+  portraitY: 588,
   portraitScale: 0.62,
-  intentOffsetY: 421,
+  intentOffsetY: 396,
   /** 1인칭 시점 — 플레이어 피격 연출 위치 (화면 하단 중앙) */
   playerHitX: GAME_WIDTH / 2,
   playerHitY: 498,
@@ -127,6 +134,7 @@ export class ExplorationScene extends Phaser.Scene {
     this.roomOptions = createRoomOptions(this.runState)
     this.currentNarrative = createLobbyNarrative(this.runState, this.persistentState)
     this.isTransitioning = false
+    this.currentBackgroundZoom = 1
     this.currentEnemy = null
     this.currentShopInventory = null
 
@@ -158,15 +166,18 @@ export class ExplorationScene extends Phaser.Scene {
       .setDepth(20)
   }
 
-  applySceneBackground(backgroundKey, { lobby = false, fitFrame = true } = {}) {
+  applySceneBackground(backgroundKey, { lobby = false, zoom } = {}) {
     if (!this.background) {
       return
     }
 
+    const coverZoom = zoom ?? this.currentBackgroundZoom ?? 1
+
     if (lobby) {
       if (this.textures.exists('background-lobby')) {
         this.background.setTexture('background-lobby').clearTint()
-        applyBackgroundCover(this.background)
+        this.currentBackgroundZoom = 1
+        applyBackgroundCover(this.background, 1)
       }
       this.sceneDimmer?.setVisible(false)
       return
@@ -176,21 +187,25 @@ export class ExplorationScene extends Phaser.Scene {
     if (this.textures.exists(textureKey)) {
       this.background.setTexture(textureKey)
       this.background.setVisible(true)
-      if (fitFrame) {
-        applyBackgroundCover(this.background)
-      }
+      this.currentBackgroundZoom = coverZoom
+      applyBackgroundCover(this.background, coverZoom)
     }
 
     const tone = getBackgroundDefinition(textureKey).explorationTone
-    if (tone?.tint) {
-      this.background.setTint(tone.tint)
+    const tint = resolveBackgroundTintForScene(textureKey, isDevBackgroundTintEnabled())
+    if (tint != null) {
+      this.background.setTint(tint)
     } else {
       this.background.clearTint()
     }
 
-    this.sceneDimmer?.setVisible(true)
-    if (tone?.dimAlpha != null) {
-      this.sceneDimmer?.setAlpha(tone.dimAlpha)
+    if (isDevBackgroundDimDisabled()) {
+      this.sceneDimmer?.setVisible(false)
+    } else {
+      this.sceneDimmer?.setVisible(true)
+      if (tone?.dimAlpha != null) {
+        this.sceneDimmer?.setAlpha(tone.dimAlpha)
+      }
     }
   }
 
@@ -361,7 +376,9 @@ export class ExplorationScene extends Phaser.Scene {
     this.devUiVisible = true
 
     this.handleDevPreview = (event) => {
-      applyDevPreview(this, event.detail?.screenId)
+      applyDevPreview(this, event.detail?.screenId, {
+        enemyId: event.detail?.enemyId,
+      })
     }
     this.handleDevExitPreview = () => {
       exitDevPreview(this)
@@ -370,15 +387,20 @@ export class ExplorationScene extends Phaser.Scene {
       this.devUiVisible = !this.devUiVisible
       this.setUiVisibility(this.devUiVisible)
     }
+    this.handleDevSettings = () => {
+      this.syncLobbyBackground()
+    }
 
     window.addEventListener('game:dev-preview', this.handleDevPreview)
     window.addEventListener('game:dev-exit-preview', this.handleDevExitPreview)
     window.addEventListener('game:dev-toggle-ui', this.handleDevToggleUi)
+    window.addEventListener('game:dev-settings', this.handleDevSettings)
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener('game:dev-preview', this.handleDevPreview)
       window.removeEventListener('game:dev-exit-preview', this.handleDevExitPreview)
       window.removeEventListener('game:dev-toggle-ui', this.handleDevToggleUi)
+      window.removeEventListener('game:dev-settings', this.handleDevSettings)
     })
   }
 
@@ -661,11 +683,16 @@ export class ExplorationScene extends Phaser.Scene {
     this.intentText.setPosition(16, 0).setFontSize(15).setColor('#e8dcc7')
   }
 
+  getCombatEnemyLayoutOffset() {
+    return getEnemyPortraitLayoutOffset(this.currentEnemy?.id)
+  }
+
   syncEnemyAttachedUi() {
     if (this.currentNarrative?.layout === 'combat' && this.currentEnemy) {
+      const { offsetX, offsetY } = this.getCombatEnemyLayoutOffset()
       this.intentIndicator.setPosition(
-        COMBAT_LAYOUT.portraitX,
-        COMBAT_LAYOUT.portraitY - COMBAT_LAYOUT.intentOffsetY,
+        COMBAT_LAYOUT.portraitX + offsetX,
+        COMBAT_LAYOUT.portraitY - COMBAT_LAYOUT.intentOffsetY + offsetY,
       )
       return
     }
@@ -880,7 +907,7 @@ export class ExplorationScene extends Phaser.Scene {
     }
 
     const backgroundKey = this.currentRoom?.backgroundKey ?? this.currentFloor.backgroundKey
-    this.applySceneBackground(backgroundKey, { fitFrame: !this.isTransitioning })
+    this.applySceneBackground(backgroundKey)
 
     if (!this.isTransitioning) {
       this.stopRoomZoomTween()
@@ -1044,8 +1071,9 @@ export class ExplorationScene extends Phaser.Scene {
       floatX = COMBAT_LAYOUT.playerHitX
       floatY = COMBAT_LAYOUT.playerHitY
     } else if (result.target === 'enemy') {
-      floatX = inCombat ? COMBAT_LAYOUT.portraitX : this.enemySprite.x
-      floatY = inCombat ? COMBAT_LAYOUT.portraitY - 100 : this.enemySprite.y - 100
+      const { offsetX, offsetY } = inCombat ? this.getCombatEnemyLayoutOffset() : { offsetX: 0, offsetY: 0 }
+      floatX = inCombat ? COMBAT_LAYOUT.portraitX + offsetX : this.enemySprite.x
+      floatY = inCombat ? COMBAT_LAYOUT.portraitY - 100 + offsetY : this.enemySprite.y - 100
     } else {
       floatX = COMBAT_LAYOUT.playerHitX
       floatY = COMBAT_LAYOUT.playerHitY
@@ -1735,10 +1763,12 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   resetBackgroundFrame() {
+    this.currentBackgroundZoom = 1
     applyBackgroundCover(this.background, 1)
   }
 
   setBackgroundZoom(zoom) {
+    this.currentBackgroundZoom = zoom
     applyBackgroundCover(this.background, zoom)
   }
 
@@ -1786,8 +1816,9 @@ export class ExplorationScene extends Phaser.Scene {
     }
 
     this.stopRoomZoomTween()
-    this.applySceneBackground(this.currentRoom.backgroundKey, { fitFrame: true })
-    this.setBackgroundZoom(ROOM_TRANSITION_PEAK_ZOOM)
+    this.applySceneBackground(this.currentRoom.backgroundKey, {
+      zoom: ROOM_TRANSITION_PEAK_ZOOM,
+    })
 
     this.enemySprite.setVisible(false)
     this.intentIndicator.setVisible(false)

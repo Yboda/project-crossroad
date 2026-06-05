@@ -22,6 +22,7 @@ export class BootScene extends Phaser.Scene {
     this.createEnemyTexture('enemy-knight', 0x222936, 0xffedb5)
     this.createEnemyTexture('enemy-leech', 0x35202b, 0xff6b9a)
     this.createEnemyTexture('enemy-hound', 0x241d22, 0xff8a3d)
+    this.createEnemyTexture('enemy-time-manager', 0x1a2438, 0xc9b46a)
     this.createIntentTextures()
     this.scene.start('ExplorationScene')
   }

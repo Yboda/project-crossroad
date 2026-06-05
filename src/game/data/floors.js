@@ -30,7 +30,7 @@ export const floors = [
     floorNumber: 3,
     depthToBoss: 4,
     backgroundKey: 'background-1f-path',
-    enemyPool: ['dark-knight', 'time-leech', 'soul-hound'],
+    enemyPool: ['dark-knight', 'time-leech', 'time-manager', 'soul-hound'],
     bossId: 'surface-warden',
     eventPool: ['mist-corridor', 'wardens-mark', 'old-altar', 'memory-door'],
     roomWeights: { battle: 55, event: 18, shop: 9, rest: 8, mystery: 10 },

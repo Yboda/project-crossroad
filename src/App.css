@@ -34,6 +34,8 @@
   height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
+  image-rendering: auto;
+  image-rendering: high-quality;
 }
 
 .run-status-bar {
@@ -1700,7 +1702,6 @@
   object-position: center;
   opacity: 0.42;
   mix-blend-mode: luminosity;
-  filter: blur(0.5px);
 }
 
 .lobby-bg-gradient {
@@ -2862,7 +2863,7 @@
 .screen-exploration {
   justify-content: flex-end;
   pointer-events: none;
-  background: linear-gradient(to bottom, transparent 0%, transparent 35%, rgba(5, 5, 5, 0.35) 55%, rgba(5, 5, 5, 0.92) 100%);
+  background: linear-gradient(to bottom, transparent 0%, transparent 42%, rgba(5, 5, 5, 0.18) 62%, rgba(5, 5, 5, 0.72) 100%);
 }
 
 .screen-exploration-inner {
@@ -2887,9 +2888,9 @@
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    transparent 38%,
-    rgba(5, 5, 5, 0.35) 55%,
-    rgba(5, 5, 5, 0.95) 100%
+    transparent 42%,
+    rgba(5, 5, 5, 0.18) 62%,
+    rgba(5, 5, 5, 0.75) 100%
   );
 }
 
@@ -2981,11 +2982,11 @@
 /* 중앙 상단 적 스택 — 의도는 Phaser, 초상은 React 이미지 */
 .combat-enemy-stack {
   position: absolute;
-  top: 140px;
+  top: 180px;
   left: 50%;
   right: auto;
   transform: translateX(-50%);
-  width: 360px;
+  width: 312px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3018,6 +3019,16 @@
   z-index: 1;
 }
 
+.combat-enemy-figure {
+  position: relative;
+  left: var(--enemy-figure-offset-x, 0px);
+  margin-top: var(--enemy-figure-offset-y, 0px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
 .combat-intent-gap {
   width: 132px;
   height: 54px;
@@ -3026,7 +3037,6 @@
 }
 
 .combat-enemy-portrait {
-  width: 336px;
   margin-bottom: 4px;
   border: none;
   border-radius: 0;
@@ -3036,7 +3046,7 @@
 
 .combat-enemy-image-portrait {
   position: relative;
-  width: 336px;
+  width: var(--enemy-portrait-width, 292px);
   display: block;
   transform-origin: bottom center;
 }
@@ -4163,9 +4173,9 @@
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    transparent 35%,
-    rgba(5, 5, 5, 0.35) 55%,
-    rgba(5, 5, 5, 0.92) 100%
+    transparent 42%,
+    rgba(5, 5, 5, 0.18) 62%,
+    rgba(5, 5, 5, 0.72) 100%
   );
   pointer-events: none;
 }
@@ -4219,9 +4229,9 @@
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    transparent 38%,
-    rgba(5, 5, 5, 0.35) 55%,
-    rgba(5, 5, 5, 0.95) 100%
+    transparent 42%,
+    rgba(5, 5, 5, 0.18) 62%,
+    rgba(5, 5, 5, 0.75) 100%
   );
   pointer-events: none;
 }
@@ -4917,6 +4927,144 @@
 
 .dev-tools-action:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+.dev-tools-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #c8c0b0;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.dev-tools-toggle-row input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+  accent-color: #d8a657;
+}
+
+.dev-tools-toggle-row span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dev-tools-toggle-row small {
+  color: #8a8478;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.dev-tools-visual {
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dev-tools-visual h3 {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8478;
+}
+
+.dev-tools-visual .dev-tools-toggle-row + .dev-tools-toggle-row {
+  margin-top: 6px;
+}
+
+.game-frame.dev-no-screen-gradient .screen-combat,
+.game-frame.dev-no-screen-gradient .screen-exploration {
+  background: transparent !important;
+}
+
+.game-frame.dev-no-screen-gradient .shop-entry-bg,
+.game-frame.dev-no-screen-gradient .shop-buy-bg {
+  background: transparent !important;
+}
+
+.game-frame.dev-no-enemy-portrait-fx .combat-enemy-stack::before {
+  display: none;
+}
+
+.game-frame.dev-no-enemy-portrait-fx .combat-enemy-image-portrait img {
+  filter: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+.dev-tools-enemy-picker {
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dev-tools-enemy-picker h3 {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #71717a;
+}
+
+.dev-tools-enemy-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dev-tools-enemy-select-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #a1a1aa;
+}
+
+.dev-tools-enemy-select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #e8dcc7;
+  font-size: 12px;
+}
+
+.dev-tools-enemy-quick {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+}
+
+.dev-tools-enemy-quick button {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #c4c4cc;
+  text-align: left;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.dev-tools-enemy-quick button:hover,
+.dev-tools-enemy-quick button.is-selected {
+  background: rgba(138, 107, 50, 0.22);
+  color: #e8dcc7;
 }
 
 .dev-tools-groups {
