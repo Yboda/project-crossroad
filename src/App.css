@@ -25,12 +25,15 @@
 .game-canvas {
   position: absolute;
   inset: 0;
+  overflow: hidden;
 }
 
 .game-frame canvas {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .run-status-bar {
@@ -1820,7 +1823,7 @@
   margin: 0 0 10px;
   font-size: 12px;
   line-height: 1.625;
-  color: #52525b;
+  color: #acacac;
 }
 
 .lobby-atmosphere p:last-child {
@@ -2705,6 +2708,45 @@
   color: #52525b;
   font-weight: 400;
 }
+
+.story-emphasis-dramatic {
+  font-family: 'Noto Serif KR', serif;
+  color: #ef4444;
+  font-weight: 700;
+  font-size: 1.05em;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  text-shadow: 0 0 14px rgba(239, 68, 68, 0.4);
+  display: inline-block;
+  animation: story-emphasis-shake 2.4s ease-in-out infinite;
+}
+
+@keyframes story-emphasis-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-emphasis-dramatic {
+    animation: none;
+  }
+}
+
 .exploration-choice-list {
   flex: 0 0 auto;
   display: flex;

@@ -23,12 +23,23 @@ export function getAttackBonus(player, enemy) {
 }
 
 export function applyDefendRelics(player) {
+  const messages = []
+
   if (hasRelic(player, 'old-shield-fragment') || hasRelic(player, 'mirror-fragment')) {
     player.mp = Math.min(player.maxMp, player.mp + 1)
     const source = hasRelic(player, 'mirror-fragment') ? '감옥 거울 조각' : '낡은 방패 파편'
-    return `${source}이 반응해 MP를 1 회복했다.`
+    messages.push(`${source}이 반응해 MP를 1 회복했다.`)
   }
-  return ''
+
+  if (hasRelic(player, 'mummy-linen')) {
+    const hpBefore = player.hp
+    player.hp = Math.min(player.maxHp, player.hp + 1)
+    if (player.hp > hpBefore) {
+      messages.push('미라의 붕대가 온기를 되돌려 HP를 1 회복했다.')
+    }
+  }
+
+  return messages.join(' ')
 }
 
 export function getShopPriceMultiplier(player) {

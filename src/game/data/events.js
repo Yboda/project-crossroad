@@ -1,5 +1,124 @@
 export const events = [
   {
+    id: '1f-corpse-pit',
+    title: '시체 구덩이',
+    backgroundKey: 'background-1f-corpse-pit',
+    story: [
+      '구덩이처럼 아래로 파인 공간을 둘러싸고 수없는 시체와 뼈가 굴러다니고 있다.',
+      '중앙에는 시체인지 모를 무언가 서 있다. 당연하게도 이 공간에는 영혼의 흔적이 가득 차 있다.',
+    ],
+    options: [
+      {
+        id: 'descend',
+        label: '구덩이 아래로 내려가본다.',
+        detail: '중앙의 형체가 당신을 기다리고 있다.',
+        result: { stage: 'inside' },
+      },
+      { id: 'leave', label: '모른척 떠난다.', detail: '구덩이의 시선을 등진다.', result: {} },
+    ],
+    stages: {
+      inside: {
+        backgroundKey: 'background-1f-inside-corpse-pit',
+        story: [
+          '아래는 위에서 본 것보다 훨씬 넓다. 뼈와 붕대 조각이 발밑을 미끄럽게 만든다.',
+          '중앙에 선 형체는 가죽 같은 래핑을 두른 미라다. 건조한 공기 속에서 낡은 천이 바스락거린다.',
+        ],
+        options: [
+          {
+            id: 'approach',
+            label: '미라에게 말을 건넨다.',
+            detail: '잠든 자의 눈이 천천히 당신을 향한다.',
+            result: { dialogue: 'mummy-1' },
+          },
+        ],
+      },
+    },
+    dialogues: {
+      'mummy-1': {
+        story: [
+          '미라의 목 안에서 마른 숨이 새어 나온다.',
+          '"...누구냐... 여기는... 잠든 자들의... 무덤이다..."',
+          '누더기 사이로 희미한 빛이 스며 나온다. 당신의 말투에 따라 반응이 달라질 것 같다.',
+        ],
+        options: [
+          {
+            id: 'gentle',
+            label: '조용히 말을 건넨다.',
+            detail: '영혼을 놀라게 하지 않으려 한다.',
+            result: { dialogue: 'mummy-2-gentle' },
+          },
+          {
+            id: 'aggressive',
+            label: '위협하며 답을 요구한다.',
+            detail: '붕대 속 형체가 경계한다.',
+            result: { dialogue: 'mummy-2-aggressive' },
+          },
+        ],
+      },
+      'mummy-2-gentle': {
+        story: [
+          '미라가 잠시 멈춘다. 구덩이 위의 뼈 소리마저 잦아든다.',
+          '"...그 말투라면... 잔향이... 너를 밀어내지 않는다..."',
+          '공기 속 영혼의 흔적이 옅은 빛으로 흔들린다. 어떻게 달래줄지 결정해야 한다.',
+        ],
+        options: [
+          {
+            id: 'soothe',
+            label: '영혼을 달래준다.',
+            detail: '잔향을 조용히 가라앉힌다.',
+            result: {
+              memoryShards: 5,
+              epilogue: [
+                '미라가 고개를 숙인다. 구덩이의 영혼들이 천천히 잠으로 돌아간다.',
+                '당신은 충분한 잔향을 건져 올리고, 뒤돌아 구덩이를 빠져나왔다.',
+              ],
+            },
+          },
+          {
+            id: 'pray',
+            label: '짧은 기도를 올린다.',
+            detail: '말 없이 잠든 자들을 기억한다.',
+            result: {
+              memoryShards: 3,
+              epilogue: [
+                '기도가 끝나자 구덩이가 조금 가벼워진다.',
+                '미라는 다시 움직이지 않았고, 당신은 잔향만 남기고 떠났다.',
+              ],
+            },
+          },
+        ],
+      },
+      'mummy-2-aggressive': {
+        story: [
+          '붕대가 팽팽하게 조여진다. 미라의 눈에서 붉은 빛이 번뜩인다.',
+          '"...침입자... 잠을... 깨운 자..."',
+          '뼈와 붕대가 바스락이며, 대화가 곧 끝날 것 같다.',
+        ],
+        options: [
+          {
+            id: 'fight',
+            label: '칼을 뽑는다.',
+            detail: '미라가 공격 자세를 취한다.',
+            result: { startBattle: 'pit-mummy' },
+          },
+          {
+            id: 'retreat',
+            label: '물러선다.',
+            detail: '미라의 분노를 피해 구덩이를 빠져나간다.',
+            result: {
+              memoryShards: 2,
+              hp: -4,
+              epilogue: [
+                '붕대가 허공을 휘두르지만 당신은 간신히 위로 올라왔다.',
+                '구덩이는 다시 고요해졌고, 손끝에 남은 잔향만이 증거였다.',
+              ],
+            },
+          },
+        ],
+      },
+    },
+  },
+  {
     id: 'old-altar',
     title: '낡은 제단',
     story: [
@@ -36,19 +155,6 @@ export const events = [
       { id: 'drink', label: '물을 마신다.', detail: 'HP와 MP를 회복한다.', result: { hp: 8, mp: 2 } },
       { id: 'drop-gold', label: '골드를 던진다.', detail: '골드 10 소모, 영혼의 흔적 획득.', result: { gold: -10, memoryShards: 3 } },
       { id: 'ignore', label: '눈을 돌린다.', detail: '아무 일도 일어나지 않는다.', result: {} },
-    ],
-  },
-  {
-    id: 'faceless-merchant',
-    title: '얼굴 없는 상인',
-    story: [
-      '상인은 얼굴 없는 후드를 숙이고, 당신이 아직 사지 않은 물건의 가격을 말한다.',
-      '그의 목소리에는 감정이 없다. 다만, 모든 문장 끝에 작은 웃음소리가 붙는다.',
-    ],
-    options: [
-      { id: 'buy-map', label: '시체의 지도를 산다.', detail: '골드 22 소모.', result: { gold: -22, relic: 'corpse-map' } },
-      { id: 'ask', label: '그의 정체를 묻는다.', detail: '문지기의 표식이 필요하다.', lockedByRelic: 'wardens-mark', result: { memoryShards: 4 } },
-      { id: 'leave', label: '떠난다.', detail: '상인의 시선을 등진다.', result: {} },
     ],
   },
   {

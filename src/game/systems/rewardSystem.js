@@ -54,10 +54,12 @@ export function getRewardStatGainLine(reward) {
 
 export function createRewardOptions(player, enemy, pendingRelicIds = []) {
   const excludeRelicIds = pendingRelicIds.filter(Boolean)
+  const isBoss = Boolean(enemy?.isBoss)
 
   return sortStatChoiceOptions(
     rewardTable
       .filter((reward) => reward.type !== 'relic' || !player.relics.includes(reward.value))
+      .filter((reward) => !isBoss || reward.type !== 'relic')
       .filter(
         (reward) =>
           !(reward.type === 'relic' && excludeRelicIds.includes(reward.value)),

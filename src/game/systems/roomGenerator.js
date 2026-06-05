@@ -1,4 +1,5 @@
 import { getFloorByIndex, isFinalFloor } from '../data/floors'
+import { getFloorMerchant } from '../data/floorMerchants'
 import { roomTypes } from '../data/roomTypes'
 
 export function createRoomOptions(runStateOrDepth, count = 3) {
@@ -62,17 +63,28 @@ function createRoomInstance(type, floor, runState, index) {
     ? floor.eventPool[(runState.totalDepth + index) % floor.eventPool.length]
     : null
 
+  const merchant = type === 'shop' ? getFloorMerchant(floor.id) : null
+  const backgroundKey =
+    type === 'boss' && floor.bossIntroBackgroundKey
+      ? floor.bossIntroBackgroundKey
+      : merchant?.backgroundKey ?? template.backgroundKey
+
   return {
     ...template,
     id: type,
     type,
+    backgroundKey,
     floorId: floor.id,
     floorNumber: floor.floorNumber,
     enemyPool: floor.enemyPool,
     bossId: floor.bossId,
     eventId,
+    merchantId: merchant?.id ?? null,
     instanceId: `${floor.id}-${type}-${runState.totalDepth}-${index}`,
-    label: type === 'boss' ? `${floor.name}의 문지기` : template.label,
+    label:
+      type === 'boss'
+        ? `${floor.name}의 문지기`
+        : merchant?.label ?? template.label,
     risk: type === 'battle' && (runState.totalDepth + index) % 3 === 0 ? '위험도 높음' : template.risk,
   }
 }

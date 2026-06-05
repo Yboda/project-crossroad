@@ -116,6 +116,19 @@ export const enemyTemplates = {
     ],
     rewards: { gold: [17, 25], memoryShards: [2, 3] },
   },
+  'pit-mummy': {
+    id: 'pit-mummy',
+    name: '구덩이의 미라',
+    textureKey: 'enemy-guard',
+    maxHp: 34,
+    attack: 7,
+    pattern: [
+      { type: 'attack', value: 7, label: '붕대 채찍' },
+      { type: 'block', value: 6, label: '눌러앉기' },
+      { type: 'attack', value: 9, label: '사지 늘이기' },
+    ],
+    rewards: { gold: [0, 0], memoryShards: [0, 0] },
+  },
 }
 
 export const bossTemplates = {

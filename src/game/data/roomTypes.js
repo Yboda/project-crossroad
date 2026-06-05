@@ -1,13 +1,9 @@
 export const roomTypes = {
   shop: {
     id: 'shop',
-    label: '나무 아래의 캠프',
+    label: '상인',
     backgroundKey: 'background-basic',
     risk: '상점',
-    story: [
-      '환한 빛에 시야가 흐려진다. 큰 나무 옆에 캠프를 친 낯선 그림자가 당신을 기다리고 있다.',
-      '후드 아래 얼굴은 보이지 않지만, 상자 안 물건들은 이미 당신의 골드를 기억하고 있는 듯하다.',
-    ],
     prompt: '당신은,',
   },
   battle: {
@@ -60,8 +56,9 @@ export const roomTypes = {
     backgroundKey: 'background-basic',
     risk: '보스',
     story: [
-      '거대한 문 앞에서 공기가 멈춘다. 문틈마다 오래된 죽음의 냄새가 배어 나온다.',
-      '이 문을 넘으려면, 이 층에 고인 시간의 주인을 쓰러뜨려야 한다. 발밑의 돌은 이미 수많은 발자국을 기억하고 있다.',
+      '낡은 문 앞에서 공기가 멈춘다. 문틈으로 오래된 죽음의 냄새가 배어 나온다.',
+      { text: '곧이어 거구의 사내가 모습을 드러낸다.', emphasis: 'dramatic' },
+      '당신은 이 문 너머로 이끌리는 영혼의 힘을 느낀다. 그와의 싸움은 필연적일 것 같다.',
     ],
     prompt: '당신은,',
   },

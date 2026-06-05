@@ -5,6 +5,28 @@ export function getEventById(id) {
   return events.find((event) => event.id === id) ?? events[0]
 }
 
+export function getEventBackgroundKey(event, stageId = null) {
+  if (!event) {
+    return null
+  }
+  if (stageId && event.stages?.[stageId]?.backgroundKey) {
+    return event.stages[stageId].backgroundKey
+  }
+  return event.backgroundKey ?? null
+}
+
+export function mapEventOptions(eventId, options = [], player) {
+  return options.map((option) => ({
+    id: `event-${eventId}-${option.id}`,
+    label: option.label,
+    detail: option.detail,
+    type: 'event-choice',
+    eventId,
+    result: option.result,
+    locked: option.lockedByRelic ? !player.relics.includes(option.lockedByRelic) : false,
+  }))
+}
+
 export function createEventNarrative(eventId, player) {
   const event = getEventById(eventId)
   return {
@@ -12,16 +34,35 @@ export function createEventNarrative(eventId, player) {
     layout: 'exploration',
     story: event.story,
     prompt: '당신은,',
-    options: event.options.map((option) => ({
-      id: `event-${event.id}-${option.id}`,
-      label: option.label,
-      detail: option.detail,
-      type: 'event-choice',
-      eventId: event.id,
-      result: option.result,
-      locked: option.lockedByRelic ? !player.relics.includes(option.lockedByRelic) : false,
-    })),
+    options: mapEventOptions(event.id, event.options, player),
   }
+}
+
+export function createEventStageNarrative(event, stage, player) {
+  return {
+    id: `event-${event.id}-stage`,
+    layout: 'exploration',
+    story: stage.story,
+    prompt: stage.prompt ?? '당신은,',
+    options: mapEventOptions(event.id, stage.options, player),
+  }
+}
+
+export function createEventDialogueNarrative(event, dialogue, dialogueId, player) {
+  return {
+    id: `event-${event.id}-dialogue-${dialogueId}`,
+    layout: 'exploration',
+    story: dialogue.story,
+    prompt: dialogue.prompt ?? '당신은,',
+    options: mapEventOptions(event.id, dialogue.options, player),
+  }
+}
+
+export function getEventBattleVictoryBonus(enemyId) {
+  if (enemyId === 'pit-mummy') {
+    return { memoryShards: 6, relic: 'mummy-linen' }
+  }
+  return null
 }
 
 export function applyEventResult(player, runState, result = {}) {

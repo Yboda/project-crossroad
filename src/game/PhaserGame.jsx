@@ -26,10 +26,17 @@ import { initGameScrollReveal } from './scrollReveal'
 import { formatSkillPreviewStat, getSkillActions, getSkillPreview } from './systems/combatSystem'
 import { getKnownSkills } from './systems/skillSystem'
 import { getRelicById } from './systems/relicSystem'
-import lobbyBackgroundUrl from '../assets/backgrounds/loby2.jpg'
+import lobbyBackgroundUrl from '../assets/backgrounds/lobby-1.png'
 import basicBackgroundUrl from '../assets/backgrounds/basic.jpg'
 import { DevToolsPanel } from './dev/DevToolsPanel'
 import { getRelicImageSrc } from './data/relicAssets'
+import {
+  getStoryEmphasisClass,
+  getStoryLineTier,
+  getStoryLineTierClass,
+  normalizeStoryLine,
+  parseInlineStoryEmphasis,
+} from './utils/storyText'
 
 const LOBBY_LAYOUTS = new Set(['lobby-main', 'body-select', 'soul-nodes'])
 const FULLSCREEN_LAYOUTS = new Set(['victory', 'death', 'level-up'])
@@ -323,6 +330,48 @@ function StoryPanel({ frameRef, narrative, isVisible, storyRef, runStatus, onCho
   )
 }
 
+/* ── Story text rendering ── */
+
+function StoryLineContent({ line }) {
+  const normalized = normalizeStoryLine(line)
+  const parts = parseInlineStoryEmphasis(normalized.text)
+
+  if (normalized.emphasis && parts.length === 1 && parts[0].type === 'plain') {
+    return <span className={getStoryEmphasisClass(normalized.emphasis)}>{normalized.text}</span>
+  }
+
+  return parts.map((part, partIndex) => {
+    if (part.type === 'emphasis') {
+      return (
+        <span key={partIndex} className={getStoryEmphasisClass(part.emphasis)}>
+          {part.text}
+        </span>
+      )
+    }
+    return <span key={partIndex}>{part.text}</span>
+  })
+}
+
+function StoryParagraph({ line, index, narrativeId }) {
+  const normalized = normalizeStoryLine(line)
+  if (!normalized.text) return null
+
+  const tier = getStoryLineTier(index, line)
+  const textClass = getStoryLineTierClass(tier)
+
+  return (
+    <p key={`${narrativeId}-s-${index}`} className={textClass}>
+      <StoryLineContent line={line} />
+    </p>
+  )
+}
+
+function StoryParagraphList({ narrativeId, story = [] }) {
+  return story.map((line, index) => (
+    <StoryParagraph key={`${narrativeId}-s-${index}`} line={line} index={index} narrativeId={narrativeId} />
+  ))
+}
+
 /* ── Exploration (rooms, events, rest) ── */
 
 function ExplorationScreen({ frameRef, narrative, isVisible, storyRef, onChoice, hidden }) {
@@ -338,20 +387,7 @@ function ExplorationScreen({ frameRef, narrative, isVisible, storyRef, onChoice,
     <aside className={`screen-exploration ${hidden}`}>
       <div className="screen-exploration-inner">
         <div className="exploration-narrative-block game-scroll" ref={storyRef}>
-          {narrative.story.map((paragraph, index) => {
-            if (!paragraph) return null
-            const textClass =
-              index === 0
-                ? 'exploration-main-text'
-                : index === 1
-                  ? 'exploration-sub-text'
-                  : 'exploration-extra-text'
-            return (
-              <p key={`${narrative.id}-s-${index}`} className={textClass}>
-                {paragraph}
-              </p>
-            )
-          })}
+          <StoryParagraphList narrativeId={narrative.id} story={narrative.story} />
         </div>
         <div className="exploration-actions">
           {narrative.prompt ? <p className="exploration-choice-prompt">{narrative.prompt}</p> : null}
@@ -1026,18 +1062,9 @@ function ShopEntryScreen({ narrative, isVisible, onChoice, hidden }) {
       <div className="shop-entry-spacer" />
       <div className="shop-entry-bottom">
         <GothicPanel className="shop-entry-panel">
-          <h3 className="shop-entry-npc">얼굴 없는 상인</h3>
+          <h3 className="shop-entry-npc">{narrative.title ?? '상인'}</h3>
           <div className="shop-entry-dialogue game-scroll">
-            {narrative.story.map((line, i) => {
-              if (!line) return null
-              const textClass =
-                i === 0 ? 'exploration-main-text' : i === 1 ? 'exploration-sub-text' : 'exploration-extra-text'
-              return (
-                <p key={i} className={textClass}>
-                  {line}
-                </p>
-              )
-            })}
+            <StoryParagraphList narrativeId={narrative.id} story={narrative.story} />
           </div>
           <ChoiceList narrative={narrative} isVisible={isVisible} onChoice={onChoice} />
         </GothicPanel>

@@ -11,8 +11,9 @@ export function createGameConfig(parent) {
     height: GAME_HEIGHT,
     backgroundColor: '#080b12',
     scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
+      // CSS가 프레임을 채우도록 스케일하고, FIT 레터박스(양옆 여백)는 사용하지 않음
+      mode: Phaser.Scale.NONE,
+      autoCenter: Phaser.Scale.NO_CENTER,
     },
     scene: [BootScene, ExplorationScene],
   }

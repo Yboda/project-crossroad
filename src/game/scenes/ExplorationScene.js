@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../constants'
-import { getBackgroundDefinition, resolveBackgroundKey } from '../data/backgrounds'
+import { applyBackgroundCover, getBackgroundDefinition, resolveBackgroundKey } from '../data/backgrounds'
 import { getFloorByIndex, isFinalFloor } from '../data/floors'
 import { createBossEnemy, createEnemy } from '../data/enemies'
 import {
@@ -10,7 +10,16 @@ import {
   getEnemyIntent,
   getSkillActions,
 } from '../systems/combatSystem'
-import { applyEventResult, applyRest, createEventNarrative } from '../systems/eventSystem'
+import {
+  applyEventResult,
+  applyRest,
+  createEventDialogueNarrative,
+  createEventNarrative,
+  createEventStageNarrative,
+  getEventBackgroundKey,
+  getEventBattleVictoryBonus,
+  getEventById,
+} from '../systems/eventSystem'
 import { createBodySelectNarrative, createLobbyNarrative, createSoulNodeNarrative } from '../systems/lobbySystem'
 import {
   applyLevelUpReward,
@@ -36,7 +45,13 @@ import {
   selectRunBody,
 } from '../systems/runState'
 import { loadPersistentState, savePersistentState, settleRun } from '../systems/saveSystem'
-import { buyShopItem, createShopInventory, createShopNarrative, createShopScreenNarrative } from '../systems/shopSystem'
+import {
+  buyShopItem,
+  createShopInventory,
+  createShopNarrative,
+  createShopScreenNarrative,
+  resolveFloorMerchant,
+} from '../systems/shopSystem'
 import { applyDevPreview, exitDevPreview } from '../dev/devPreview'
 import { createRoomOptions } from '../systems/roomGenerator'
 import { getRelicById } from '../systems/relicSystem'
@@ -122,8 +137,8 @@ export class ExplorationScene extends Phaser.Scene {
       this.currentNarrative?.layout === 'lobby-main' ? 'background-lobby' : this.currentFloor.backgroundKey
     this.background = this.add
       .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, resolveBackgroundKey(initialBackgroundKey))
-      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
       .setDepth(0)
+    applyBackgroundCover(this.background)
 
     this.sceneDimmer = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.18).setOrigin(0).setDepth(1)
 
@@ -145,20 +160,19 @@ export class ExplorationScene extends Phaser.Scene {
 
     if (lobby) {
       if (this.textures.exists('background-lobby')) {
-        this.background.setTexture('background-lobby').setDisplaySize(GAME_WIDTH, GAME_HEIGHT).clearTint()
+        this.background.setTexture('background-lobby').clearTint()
+        applyBackgroundCover(this.background)
       }
-      this.background?.setOrigin(0.5, 0.5).setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2).setScale(1)
       this.sceneDimmer?.setVisible(false)
       return
     }
 
     const textureKey = resolveBackgroundKey(backgroundKey)
     if (this.textures.exists(textureKey)) {
+      this.background.setTexture(textureKey)
+      this.background.setVisible(true)
       if (fitFrame) {
-        this.background.setTexture(textureKey).setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-        this.background.setOrigin(0.5, 0.5).setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2).setScale(1)
-      } else {
-        this.background.setTexture(textureKey)
+        applyBackgroundCover(this.background)
       }
     }
 
@@ -257,9 +271,11 @@ export class ExplorationScene extends Phaser.Scene {
       return
     }
 
+    const backgroundKey = this.getActiveBackgroundKey()
     this.currentNarrative = {
       ...this.currentNarrative,
       combatMeta: this.createCombatMeta(getEnemyIntent(this.currentEnemy)),
+      ...(backgroundKey ? { backgroundKey } : {}),
     }
     window.dispatchEvent(new CustomEvent('game:narrative', { detail: this.currentNarrative }))
   }
@@ -360,17 +376,27 @@ export class ExplorationScene extends Phaser.Scene {
     })
   }
 
+  applyEventRoomBackground(eventId, stageId = null) {
+    const event = getEventById(eventId)
+    const backgroundKey = getEventBackgroundKey(event, stageId)
+    if (!backgroundKey || !this.currentRoom) {
+      return
+    }
+    this.currentRoom = { ...this.currentRoom, backgroundKey }
+  }
+
   createRoomNarrative(room) {
     if (room.type === 'battle' || room.type === 'boss') {
       return this.createBattleIntroNarrative(room)
     }
 
     if (room.type === 'event' || room.type === 'mystery') {
+      this.applyEventRoomBackground(room.eventId)
       return createEventNarrative(room.eventId, this.player)
     }
 
     if (room.type === 'shop') {
-      return createShopNarrative(this.player, this.runState)
+      return createShopNarrative(this.player, this.runState, resolveFloorMerchant(this.runState, room))
     }
 
     if (room.type === 'rest') {
@@ -410,13 +436,20 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   createBattleIntroNarrative(room) {
+    const battlePrepLine =
+      '당신은 무기 손잡이를 고쳐 쥔다. 이번 전투에서 살아남는다면, 분명 조금 더 강해질 것이다.'
+    const story =
+      room.type === 'boss'
+        ? room.story.filter(Boolean)
+        : [
+            room.story[0],
+            `${room.story[1] ?? ''} ${battlePrepLine}`.trim(),
+          ]
+
     return {
       id: `battle-intro-${room.instanceId ?? room.id}-${this.depth}`,
       layout: 'exploration',
-      story: [
-        room.story[0],
-        `${room.story[1] ?? ''} 당신은 무기 손잡이를 고쳐 쥔다. 이번 전투에서 살아남는다면, 분명 조금 더 강해질 것이다.`.trim(),
-      ],
+      story,
       prompt: '당신은,',
       options: this.createUiOptions([
         {
@@ -662,10 +695,14 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   createVictoryNarrative(log = [], pendingRelicOverride = undefined) {
-    const bossId = this.currentEnemy?.isBoss ? this.currentEnemy.id : null
+    const isBoss = Boolean(this.currentEnemy?.isBoss)
+    const bossId = isBoss ? this.currentEnemy.id : null
     const pendingBossRelicId = bossId ? rollBossPendingRelic(bossId, this.player) : null
-    const pendingRelicId =
-      pendingRelicOverride !== undefined ? pendingRelicOverride : rollVictoryPendingRelic(this.player)
+    const pendingRelicId = isBoss
+      ? null
+      : pendingRelicOverride !== undefined
+        ? pendingRelicOverride
+        : rollVictoryPendingRelic(this.player)
     const rewardEntries = createRewardOptions(this.player, this.currentEnemy, [
       pendingRelicId,
       pendingBossRelicId,
@@ -740,21 +777,69 @@ export class ExplorationScene extends Phaser.Scene {
     }
   }
 
+  needsFirstFloorBossRest(defeatedBoss) {
+    return Boolean(defeatedBoss) && this.runState.floorIndex === 0
+  }
+
+  createPostCombatContinueOptions(defeatedBoss) {
+    if (this.needsFirstFloorBossRest(defeatedBoss)) {
+      return [
+        {
+          id: 'open-boss-door',
+          label: '조심스럽게 문을 연다.',
+          detail: '문 너머의 공기를 가늠한다.',
+          type: 'boss-floor-rest',
+        },
+      ]
+    }
+
+    return [
+      {
+        id: 'post-reward-continue',
+        label: defeatedBoss ? '다음 층으로 오른다.' : '다음 장소로 향한다.',
+        detail: defeatedBoss ? '층의 문이 열린다.' : '미궁은 계속 이어진다.',
+        type: 'continue-run',
+        variant: defeatedBoss ? 'floor-ascend' : undefined,
+      },
+    ]
+  }
+
+  showFirstFloorBossRestScene() {
+    this.player.hp = this.player.maxHp
+    this.player.mp = this.player.maxMp
+    this.updateHud()
+
+    this.currentNarrative = {
+      id: `boss-floor-rest-${this.depth}-${Date.now()}`,
+      layout: 'exploration',
+      story: [
+        '문을 열고 나오자, 위로 이어지는 원형 계단이 보였다.',
+        '그 옆으로는 어울리지 않게 모닥불이 피어 있었다.',
+        '지친 몸을 그 옆에 뉘였다.',
+        'HP와 MP가 모두 회복되었다.',
+        '이제 다음 층으로 오를 준비가 되었다.',
+      ],
+      prompt: '당신은,',
+      options: this.createUiOptions([
+        {
+          id: 'post-reward-continue',
+          label: '다음 층으로 오른다.',
+          detail: '층의 문이 열린다.',
+          type: 'continue-run',
+          variant: 'floor-ascend',
+        },
+      ]),
+    }
+    this.publishNarrative()
+  }
+
   showPostCombatExploration(storyLines, defeatedBoss) {
     this.currentNarrative = {
       id: `post-combat-${this.depth}-${Date.now()}`,
       layout: 'exploration',
       story: storyLines,
       prompt: '당신은,',
-      options: this.createUiOptions([
-        {
-          id: 'post-reward-continue',
-          label: defeatedBoss ? '다음 층으로 오른다.' : '다음 장소로 향한다.',
-          detail: defeatedBoss ? '층의 문이 열린다.' : '미궁은 계속 이어진다.',
-          type: 'continue-run',
-          variant: defeatedBoss ? 'floor-ascend' : undefined,
-        },
-      ]),
+      options: this.createUiOptions(this.createPostCombatContinueOptions(defeatedBoss)),
     }
     this.publishNarrative()
   }
@@ -794,16 +879,29 @@ export class ExplorationScene extends Phaser.Scene {
     }
   }
 
+  getActiveBackgroundKey() {
+    if (this.currentNarrative?.layout === 'lobby-main') {
+      return 'background-lobby'
+    }
+    return this.currentRoom?.backgroundKey ?? this.currentFloor?.backgroundKey ?? null
+  }
+
   publishNarrative() {
     this.syncLobbyBackground()
     this.syncCombatPresentation()
-    if (this.currentNarrative?.layout === 'combat' && this.currentEnemy) {
-      this.currentNarrative = {
-        ...this.currentNarrative,
+    let narrative = { ...this.currentNarrative }
+    if (narrative.layout === 'combat' && this.currentEnemy) {
+      narrative = {
+        ...narrative,
         combatMeta: this.createCombatMeta(getEnemyIntent(this.currentEnemy)),
       }
     }
-    window.dispatchEvent(new CustomEvent('game:narrative', { detail: this.currentNarrative }))
+    const backgroundKey = this.getActiveBackgroundKey()
+    if (backgroundKey) {
+      narrative = { ...narrative, backgroundKey }
+    }
+    this.currentNarrative = narrative
+    window.dispatchEvent(new CustomEvent('game:narrative', { detail: narrative }))
   }
 
   setUiVisibility(visible) {
@@ -1035,6 +1133,11 @@ export class ExplorationScene extends Phaser.Scene {
       return
     }
 
+    if (option.type === 'boss-floor-rest') {
+      this.showFirstFloorBossRestScene()
+      return
+    }
+
     if (option.type === 'continue-run') {
       this.continueRun()
       return
@@ -1061,7 +1164,11 @@ export class ExplorationScene extends Phaser.Scene {
     }
 
     if (option.type === 'close-shop') {
-      this.currentNarrative = createShopNarrative(this.player, this.runState)
+      this.currentNarrative = createShopNarrative(
+        this.player,
+        this.runState,
+        resolveFloorMerchant(this.runState, this.currentRoom),
+      )
       this.publishNarrative()
       return
     }
@@ -1186,20 +1293,89 @@ export class ExplorationScene extends Phaser.Scene {
     this.time.delayedCall(220, () => this.playRoomTransition(nextRoom))
   }
 
-  resolveEventChoice(option) {
-    const relicWasOwned = option.result?.relic ? this.player.relics.includes(option.result.relic) : false
-    const messages = applyEventResult(this.player, this.runState, option.result)
+  openEventStage(eventId, stageId) {
+    const event = getEventById(eventId)
+    const stage = event.stages?.[stageId]
+    if (!stage) {
+      return
+    }
+
+    this.activeEventStage = stageId
+    this.applyEventRoomBackground(eventId, stageId)
+    this.currentNarrative = createEventStageNarrative(event, stage, this.player)
+    this.publishNarrative()
+  }
+
+  openEventDialogue(eventId, dialogueId) {
+    const event = getEventById(eventId)
+    const dialogue = event.dialogues?.[dialogueId]
+    if (!dialogue) {
+      return
+    }
+
+    this.currentNarrative = createEventDialogueNarrative(event, dialogue, dialogueId, this.player)
+    this.publishNarrative()
+  }
+
+  startEventBattle(enemyId) {
+    const floor = getFloorByIndex(this.runState.floorIndex)
+    this.pendingEventVictoryBonus = getEventBattleVictoryBonus(enemyId)
+    this.currentEnemy = createEnemy({
+      enemyId,
+      totalDepth: this.runState.totalDepth,
+      difficulty: floor.difficulty,
+    })
+
+    const initiative = this.determineBattleInitiative()
+    this.enemySprite.setTexture(this.currentEnemy.textureKey).setVisible(true).setAlpha(1)
+    this.enemyBattleHud.setVisible(false)
+    this.applyCombatEnemyLayout()
     this.updateHud()
+    this.startEnemyIdleMotion()
+
+    if (initiative === 'enemy') {
+      this.startEnemyAmbush()
+      return
+    }
+
+    this.runState.hasStealthApproach = false
+    this.setCombatLog([`당신은 ${this.currentEnemy.name}에게 맞섰다! (플레이어 턴)`])
+    this.publishCombatNarrative()
+  }
+
+  resolveEventChoice(option) {
+    const result = option.result ?? {}
+
+    if (result.stage) {
+      this.openEventStage(option.eventId, result.stage)
+      return
+    }
+
+    if (result.dialogue) {
+      this.openEventDialogue(option.eventId, result.dialogue)
+      return
+    }
+
+    if (result.startBattle) {
+      this.startEventBattle(result.startBattle)
+      return
+    }
+
+    const relicWasOwned = result.relic ? this.player.relics.includes(result.relic) : false
+    const messages = applyEventResult(this.player, this.runState, result)
+    this.updateHud()
+
+    const epilogue = result.epilogue ?? ['미궁은 당신의 선택을 기억한 채, 다음 길을 기다린다.']
+    this.activeEventStage = null
     this.currentNarrative = {
       id: `event-result-${option.id}`,
       layout: 'exploration',
-      story: [
-        ...messages,
-        '미궁은 당신의 선택을 기억한 채, 다음 길을 기다린다.',
-      ],
-      modal: option.result?.relic && !relicWasOwned ? this.createRelicModal(option.result.relic) : null,
+      story: [...messages, ...epilogue],
+      modal: result.relic && !relicWasOwned ? this.createRelicModal(result.relic) : null,
       prompt: '당신은,',
-      options: this.createUiOptions([{ id: 'event-continue', label: '다음 장소로 향한다.', detail: '미궁은 계속 이어진다.', type: 'continue-run' }]),
+      options: this.createUiOptions([
+        { id: 'event-continue', label: '다음 장소로 향한다.', detail: '미궁은 계속 이어진다.', type: 'continue-run' },
+      ]),
     }
     this.publishNarrative()
   }
@@ -1227,11 +1403,13 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   createCurrentShopScreen(messages = []) {
+    const merchant = resolveFloorMerchant(this.runState, this.currentRoom)
+
     if (!this.currentShopInventory) {
-      this.currentShopInventory = createShopInventory(this.player, this.runState)
+      this.currentShopInventory = createShopInventory(this.player, this.runState, merchant)
     }
 
-    return createShopScreenNarrative(this.runState, this.currentShopInventory, messages)
+    return createShopScreenNarrative(this.runState, this.currentShopInventory, merchant, messages)
   }
 
   resolveRest(restType) {
@@ -1394,6 +1572,11 @@ export class ExplorationScene extends Phaser.Scene {
             victoryLog.push(`기억 해금: ${memory.title}`)
           }
         }
+        if (this.pendingEventVictoryBonus) {
+          victoryLog.push(...applyEventResult(this.player, this.runState, this.pendingEventVictoryBonus))
+          this.pendingEventVictoryBonus = null
+          this.updateHud()
+        }
         savePersistentState(this.persistentState)
         this.updateHud()
         if (expResult.leveledUp) {
@@ -1502,15 +1685,7 @@ export class ExplorationScene extends Phaser.Scene {
       }),
       modal: relicModal,
       prompt: '당신은,',
-      options: this.createUiOptions([
-        {
-          id: 'post-reward-continue',
-          label: defeatedBoss ? '다음 층으로 오른다.' : '다음 장소로 향한다.',
-          detail: defeatedBoss ? '층의 문이 열린다.' : '미궁은 계속 이어진다.',
-          type: 'continue-run',
-          variant: defeatedBoss ? 'floor-ascend' : undefined,
-        },
-      ]),
+      options: this.createUiOptions(this.createPostCombatContinueOptions(defeatedBoss)),
     }
     this.publishNarrative()
   }
@@ -1524,25 +1699,11 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   resetBackgroundFrame() {
-    const bg = this.background
-    if (!bg) {
-      return
-    }
-
-    bg.setOrigin(0.5, 0.5)
-    bg.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2)
-    bg.setScale(1)
-    bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+    applyBackgroundCover(this.background, 1)
   }
 
   setBackgroundZoom(zoom) {
-    const bg = this.background
-    if (!bg) {
-      return
-    }
-
-    bg.setScale(1)
-    bg.setDisplaySize(GAME_WIDTH * zoom, GAME_HEIGHT * zoom)
+    applyBackgroundCover(this.background, zoom)
   }
 
   playRoomTransition(room) {
@@ -1578,12 +1739,18 @@ export class ExplorationScene extends Phaser.Scene {
     recordRoomVisit(this.runState, room)
     this.depth = this.runState.totalDepth
     this.currentRoom = room
+    this.activeEventStage = null
+    this.pendingEventVictoryBonus = null
     this.currentShopInventory = null
     this.currentFloor = getFloorByIndex(this.runState.floorIndex)
     this.roomOptions = createRoomOptions(this.runState)
 
+    if (room.type === 'event' || room.type === 'mystery') {
+      this.applyEventRoomBackground(room.eventId)
+    }
+
     this.stopRoomZoomTween()
-    this.applySceneBackground(room.backgroundKey, { fitFrame: false })
+    this.applySceneBackground(this.currentRoom.backgroundKey, { fitFrame: true })
     this.setBackgroundZoom(ROOM_TRANSITION_PEAK_ZOOM)
 
     this.enemySprite.setVisible(false)

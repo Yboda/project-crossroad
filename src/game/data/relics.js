@@ -144,6 +144,14 @@ export const relics = [
     hooks: ['onRoomGen'],
   },
   {
+    id: 'mummy-linen',
+    name: '미라의 붕대',
+    description: '방어할 때 HP를 1 회복한다.',
+    flavorLine: '잠든 자의 온기가 아직 남아 있다.',
+    icon: '🩹',
+    hooks: ['onDefend'],
+  },
+  {
     id: 'sealed-name',
     name: '봉인된 이름의 기억',
     description: '중심부 루트의 기억 조건 일부를 대신한다.',
