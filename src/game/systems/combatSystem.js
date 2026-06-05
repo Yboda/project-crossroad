@@ -1,4 +1,4 @@
-import { applyDefendRelics, getAttackBonus } from './relicSystem'
+import { applyDefendRelics, getAttackBonus, getEffectiveDefense } from './relicSystem'
 
 export function createPlayerState(character) {
   return {
@@ -28,7 +28,7 @@ export function getBattleActions(player, enemy) {
     {
       id: 'defend',
       label: '방어 자세를 취한다.',
-      detail: `방어도 ${player.defense} 획득`,
+      detail: `방어도 ${getEffectiveDefense(player)} 획득`,
       type: 'battle-action',
     },
     {
@@ -50,7 +50,7 @@ export function getSkillPreview(skillId, player, enemy = { block: 0 }) {
   }
 
   if (skillId === 'mana-guard') {
-    return { kind: 'block', block: player.defense + 4 }
+    return { kind: 'block', block: getEffectiveDefense(player) + 4 }
   }
 
   return null
@@ -89,7 +89,7 @@ export function getSkillActions(player, enemy) {
     {
       id: 'mana-guard',
       label: '마력 방패',
-      detail: player.mp >= 2 ? `MP 2 소모 / 방어도 ${player.defense + 4} 획득` : 'MP 2 필요',
+      detail: player.mp >= 2 ? `MP 2 소모 / 방어도 ${getEffectiveDefense(player) + 4} 획득` : 'MP 2 필요',
       type: 'skill-action',
       locked: player.mp < 2,
     },
@@ -103,7 +103,15 @@ export function getSkillActions(player, enemy) {
 }
 
 export function getEnemyIntent(enemy) {
-  const intent = enemy.pattern[enemy.turn % enemy.pattern.length]
+  const pattern = enemy?.pattern ?? []
+  if (!pattern.length) {
+    return { type: 'attack', value: enemy?.attack ?? 0, label: '공격', description: '공격 준비' }
+  }
+
+  const intent = pattern[enemy.turn % pattern.length]
+  if (!intent) {
+    return { type: 'attack', value: enemy?.attack ?? 0, label: '공격', description: '공격 준비' }
+  }
 
   if (intent.type === 'attack') {
     return {
@@ -145,12 +153,13 @@ export function applyPlayerAction(player, enemy, actionId) {
 
   if (actionId === 'defend') {
     enemy.block = 0
-    player.block += player.defense
+    const defenseGain = getEffectiveDefense(player)
+    player.block += defenseGain
     const relicMessage = applyDefendRelics(player)
     return {
-      message: [`당신은 자세를 낮추고 방어도 ${player.defense}을 얻었다.`, relicMessage].filter(Boolean).join(' '),
+      message: [`당신은 자세를 낮추고 방어도 ${defenseGain}을 얻었다.`, relicMessage].filter(Boolean).join(' '),
       target: 'player',
-      floatText: `+${player.defense}`,
+      floatText: `+${defenseGain}`,
       floatType: 'block',
     }
   }
@@ -170,7 +179,7 @@ export function applyPlayerAction(player, enemy, actionId) {
   }
 
   if (actionId === 'mana-guard') {
-    const block = player.defense + 4
+    const block = getEffectiveDefense(player) + 4
     enemy.block = 0
     player.mp = Math.max(0, player.mp - 2)
     player.block += block

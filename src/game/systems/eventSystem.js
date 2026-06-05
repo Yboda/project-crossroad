@@ -15,6 +15,21 @@ export function getEventBackgroundKey(event, stageId = null) {
   return event.backgroundKey ?? null
 }
 
+export function buildEventStory(event, player) {
+  const story = [...(event.story ?? [])]
+
+  if (event.relicStory) {
+    for (const relicId of player.relics ?? []) {
+      const extraLines = event.relicStory[relicId]
+      if (extraLines?.length) {
+        story.push(...extraLines)
+      }
+    }
+  }
+
+  return story
+}
+
 export function mapEventOptions(eventId, options = [], player) {
   return options.map((option) => ({
     id: `event-${eventId}-${option.id}`,
@@ -32,7 +47,7 @@ export function createEventNarrative(eventId, player) {
   return {
     id: `event-${event.id}`,
     layout: 'exploration',
-    story: event.story,
+    story: buildEventStory(event, player),
     prompt: '당신은,',
     options: mapEventOptions(event.id, event.options, player),
   }
@@ -104,7 +119,13 @@ export function applyEventResult(player, runState, result = {}) {
     messages.push('다음 전투에서 기습할 기회를 잡았다.')
   }
 
-  return messages.length ? messages : ['아무 일도 일어나지 않았다.']
+  if (messages.length) {
+    return messages
+  }
+  if (result.epilogue?.length) {
+    return []
+  }
+  return ['아무 일도 일어나지 않았다.']
 }
 
 export function applyRest(player, restType) {

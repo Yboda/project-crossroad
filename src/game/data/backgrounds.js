@@ -1,8 +1,9 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../constants'
-import basicBackgroundUrl from '../../assets/backgrounds/basic.jpg'
+import path1fBackgroundUrl from '../../assets/backgrounds/test3.png'
+import deathBackgroundUrl from '../../assets/backgrounds/death.jpg'
 import lobbyBackgroundUrl from '../../assets/backgrounds/lobby-1.png'
 import boss1FrontBackgroundUrl from '../../assets/backgrounds/1f-front-of-boss-room.png'
-import merchant1fBackgroundUrl from '../../assets/backgrounds/1f-merchant.png'
+import merchant1fBackgroundUrl from '../../assets/backgrounds/1f-merchant.jpg'
 import corpsePit1fBackgroundUrl from '../../assets/backgrounds/1f-corpse-pit.png'
 import insideCorpsePit1fBackgroundUrl from '../../assets/backgrounds/1f-inside-the-corpse-pit.png'
 
@@ -21,18 +22,41 @@ export const BACKGROUND_TEXTURES = {
   'background-lobby': {
     url: lobbyBackgroundUrl,
   },
-  'background-basic': {
-    url: basicBackgroundUrl,
+  'background-1f-path': {
+    url: path1fBackgroundUrl,
     explorationTone: {
       tint: 0xb8b8b8,
       dimAlpha: 0.26,
     },
+    enemyPortraitTone: {
+      brightness: 0.92,
+      contrast: 1.05,
+      saturate: 0.75,
+      sepia: 0.12,
+      vignetteInner: 0.38,
+      vignetteMid: 0.14,
+      fadeStart: 96,
+      fadeEnd: 100,
+    },
+  },
+  'background-death': {
+    url: deathBackgroundUrl,
   },
   'background-boss-1f-front': {
     url: boss1FrontBackgroundUrl,
     explorationTone: {
       tint: 0xc8c0b8,
       dimAlpha: 0.2,
+    },
+    enemyPortraitTone: {
+      brightness: 0.94,
+      contrast: 1.04,
+      saturate: 0.8,
+      sepia: 0.08,
+      vignetteInner: 0.32,
+      vignetteMid: 0.11,
+      fadeStart: 74,
+      fadeEnd: 98,
     },
   },
   'background-1f-merchant': {
@@ -41,12 +65,32 @@ export const BACKGROUND_TEXTURES = {
       tint: 0xb8b4ac,
       dimAlpha: 0.22,
     },
+    enemyPortraitTone: {
+      brightness: 0.93,
+      contrast: 1.05,
+      saturate: 0.78,
+      sepia: 0.1,
+      vignetteInner: 0.35,
+      vignetteMid: 0.12,
+      fadeStart: 96,
+      fadeEnd: 99.5,
+    },
   },
   'background-1f-corpse-pit': {
     url: corpsePit1fBackgroundUrl,
     explorationTone: {
       tint: 0xa8a4a0,
       dimAlpha: 0.24,
+    },
+    enemyPortraitTone: {
+      brightness: 0.9,
+      contrast: 1.06,
+      saturate: 0.72,
+      sepia: 0.14,
+      vignetteInner: 0.4,
+      vignetteMid: 0.15,
+      fadeStart: 95,
+      fadeEnd: 99.5,
     },
   },
   'background-1f-inside-corpse-pit': {
@@ -55,14 +99,36 @@ export const BACKGROUND_TEXTURES = {
       tint: 0x9c9894,
       dimAlpha: 0.28,
     },
+    enemyPortraitTone: {
+      brightness: 0.87,
+      contrast: 1.07,
+      saturate: 0.68,
+      sepia: 0.16,
+      vignetteInner: 0.44,
+      vignetteMid: 0.17,
+      fadeStart: 94,
+      fadeEnd: 99,
+    },
   },
 }
 
-/** 탐험 기본 배경 (임시: 전체 공용) */
-export const DEFAULT_EXPLORATION_BACKGROUND = 'background-basic'
+/** 탐험 기본 배경 */
+export const DEFAULT_EXPLORATION_BACKGROUND = 'background-1f-path'
 
-/** 예전 절차적 배경 키 → 당분간 basic.jpg 로 통일 */
+const DEFAULT_ENEMY_PORTRAIT_TONE = {
+  brightness: 0.92,
+  contrast: 1.05,
+  saturate: 0.75,
+  sepia: 0.12,
+  vignetteInner: 0.38,
+  vignetteMid: 0.14,
+  fadeStart: 96,
+  fadeEnd: 100,
+}
+
+/** 예전 배경 키 호환 */
 export const LEGACY_BACKGROUND_KEYS = {
+  'background-basic': DEFAULT_EXPLORATION_BACKGROUND,
   'background-forest': DEFAULT_EXPLORATION_BACKGROUND,
   'background-ruins': DEFAULT_EXPLORATION_BACKGROUND,
   'background-mist': DEFAULT_EXPLORATION_BACKGROUND,
@@ -83,6 +149,32 @@ export function getBackgroundDefinition(key) {
 
 export function getBackgroundImageUrl(key) {
   return getBackgroundDefinition(key).url
+}
+
+/** 전투 몬스터 일러스트 CSS filter — explorationTone과 짝을 맞춘 프리셋 */
+export function getEnemyPortraitTone(key) {
+  const definition = getBackgroundDefinition(key)
+  return definition.enemyPortraitTone ?? DEFAULT_ENEMY_PORTRAIT_TONE
+}
+
+export function getEnemyPortraitToneStyle(key) {
+  const tone = getEnemyPortraitTone(key)
+  return {
+    '--enemy-filter-brightness': String(tone.brightness),
+    '--enemy-filter-contrast': String(tone.contrast),
+    '--enemy-filter-saturate': String(tone.saturate),
+    '--enemy-filter-sepia': String(tone.sepia),
+    '--enemy-vignette-inner': String(tone.vignetteInner),
+    '--enemy-vignette-mid': String(tone.vignetteMid),
+    '--enemy-fade-start': `${tone.fadeStart}%`,
+    '--enemy-fade-end': `${tone.fadeEnd}%`,
+  }
+}
+
+export function getEnemyPortraitBackgroundClass(key) {
+  const resolved = resolveBackgroundKey(key)
+  const slug = resolved.replace(/^background-/, '')
+  return `combat-enemy-bg--${slug}`
 }
 
 export function getBackgroundTextureKeysToPreload() {

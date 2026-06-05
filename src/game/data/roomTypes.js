@@ -2,14 +2,14 @@ export const roomTypes = {
   shop: {
     id: 'shop',
     label: '상인',
-    backgroundKey: 'background-basic',
+    backgroundKey: 'background-1f-path',
     risk: '상점',
     prompt: '당신은,',
   },
   battle: {
     id: 'battle',
     label: '괴물의 흔적',
-    backgroundKey: 'background-basic',
+    backgroundKey: 'background-1f-path',
     risk: '위험도 보통',
     story: [
       '어두운 숲길 끝에서 낮은 울음소리가 들려온다. 젖은 흙 위에는 검게 마른 피가 번져 있다.',
@@ -20,7 +20,7 @@ export const roomTypes = {
   event: {
     id: 'event',
     label: '낡은 제단',
-    backgroundKey: 'background-basic',
+    backgroundKey: 'background-1f-path',
     risk: '사건',
     story: [
       '허물어진 돌기둥 사이, 검은 촛불이 바람도 없이 흔들린다. 공기는 오래된 재 냄새로 무겁다.',
@@ -31,7 +31,7 @@ export const roomTypes = {
   mystery: {
     id: 'mystery',
     label: '안개 낀 통로',
-    backgroundKey: 'background-basic',
+    backgroundKey: 'background-1f-path',
     risk: '정보 부족',
     story: [
       '회색 안개가 길을 삼킨다. 몇 걸음 앞도 보이지 않지만, 안개 너머에서 누군가 속삭이는 듯하다.',
@@ -42,7 +42,7 @@ export const roomTypes = {
   rest: {
     id: 'rest',
     label: '희미한 모닥불',
-    backgroundKey: 'background-basic',
+    backgroundKey: 'background-1f-path',
     risk: '안전',
     story: [
       '꺼져가는 모닥불이 동굴 벽에 긴 그림자를 만든다. 누가 남기고 간 담요와 빈 냄비가 놓여 있다.',
@@ -53,7 +53,7 @@ export const roomTypes = {
   boss: {
     id: 'boss',
     label: '층의 문',
-    backgroundKey: 'background-basic',
+    backgroundKey: 'background-1f-path',
     risk: '보스',
     story: [
       '낡은 문 앞에서 공기가 멈춘다. 문틈으로 오래된 죽음의 냄새가 배어 나온다.',
@@ -65,7 +65,7 @@ export const roomTypes = {
   ending: {
     id: 'ending',
     label: '지상문',
-    backgroundKey: 'background-basic',
+    backgroundKey: 'background-1f-path',
     risk: '결말',
     story: [
       '끝없이 이어지던 계단이 마침내 끊기고, 눈부신 문 하나가 나타난다.',

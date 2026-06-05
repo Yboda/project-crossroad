@@ -21,6 +21,7 @@ export function createLobbyNarrative(runState, persistentState) {
       memoryShards: persistentState.memoryShards,
       unlockedSoulNodes: persistentState.unlockedSoulNodes.length,
       selectedBodyName: runState.currentBody?.name ?? '미선택',
+      selectedBodyClassId: runState.currentBody?.classId ?? null,
     },
     prompt: '로비 메뉴',
     options: [

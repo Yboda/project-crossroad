@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, useAnimation, useReducedMotion } from 'framer-motion'
 import Phaser from 'phaser'
 import {
   Ghost,
@@ -24,11 +24,18 @@ import {
 import { createGameConfig } from './config'
 import { initGameScrollReveal } from './scrollReveal'
 import { formatSkillPreviewStat, getSkillActions, getSkillPreview } from './systems/combatSystem'
+import { ENEMY_MOTION_PRESETS, SCREEN_EFFECT_DURATIONS_MS } from './systems/combatMotionSystem'
 import { getKnownSkills } from './systems/skillSystem'
 import { getRelicById } from './systems/relicSystem'
 import lobbyBackgroundUrl from '../assets/backgrounds/lobby-1.png'
-import basicBackgroundUrl from '../assets/backgrounds/basic.jpg'
+import deathBackgroundUrl from '../assets/backgrounds/death.jpg'
 import { DevToolsPanel } from './dev/DevToolsPanel'
+import {
+  getEnemyPortraitBackgroundClass,
+  getEnemyPortraitToneStyle,
+} from './data/backgrounds'
+import { getCharacterImageSrc } from './data/characterAssets'
+import { getEnemyImageSrc } from './data/enemyAssets'
 import { getRelicImageSrc } from './data/relicAssets'
 import {
   getStoryEmphasisClass,
@@ -237,7 +244,7 @@ function TopHUD({ status, onOpen, onMenu }) {
         <div className="top-hud-player">
           <button className="top-hud-identity-btn" onClick={onOpen} type="button" aria-label="캐릭터 정보">
             <div className="top-hud-avatar-box">
-              <Ghost size={20} />
+              <BodyClassIcon classId={status.bodyClassId} size="hud" />
             </div>
             <div className="top-hud-name">
               <strong>{status.bodyName}</strong>
@@ -263,6 +270,111 @@ function TopHUD({ status, onOpen, onMenu }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function useCombatMotion(reduceMotion) {
+  const [enemyMotionCue, setEnemyMotionCue] = useState(null)
+  const [screenEffect, setScreenEffect] = useState(null)
+  const [isShaking, setIsShaking] = useState(false)
+  const motionGeneration = useRef(0)
+
+  useEffect(() => {
+    const handleCombatMotion = (event) => {
+      const { enemy, screen } = event.detail ?? {}
+      const generation = ++motionGeneration.current
+
+      if (enemy && !reduceMotion) {
+        setEnemyMotionCue(enemy)
+        const preset = ENEMY_MOTION_PRESETS[enemy]
+        const durationMs = preset?.transition?.duration
+          ? Math.ceil(preset.transition.duration * 1000) + 40
+          : 400
+        window.setTimeout(() => {
+          if (motionGeneration.current === generation && enemy !== 'enemy-defeat') {
+            setEnemyMotionCue(null)
+          }
+        }, durationMs)
+      }
+
+      if (screen && !reduceMotion) {
+        setScreenEffect(screen)
+        if (screen === 'player-hit' || screen === 'player-attack-strong') {
+          setIsShaking(true)
+        }
+        const durationMs = SCREEN_EFFECT_DURATIONS_MS[screen] ?? 200
+        window.setTimeout(() => {
+          if (motionGeneration.current === generation) {
+            setScreenEffect(null)
+            setIsShaking(false)
+          }
+        }, durationMs)
+      }
+    }
+
+    window.addEventListener('game:combat-motion', handleCombatMotion)
+    return () => window.removeEventListener('game:combat-motion', handleCombatMotion)
+  }, [reduceMotion])
+
+  return { enemyMotionCue, screenEffect, isShaking }
+}
+
+function EnemyPortrait({ enemyId, motionCue = null, className = '' }) {
+  const reduceMotion = useReducedMotion()
+  const controls = useAnimation()
+  const imageSrc = getEnemyImageSrc(enemyId)
+
+  useEffect(() => {
+    if (reduceMotion) return undefined
+
+    if (motionCue && ENEMY_MOTION_PRESETS[motionCue]) {
+      const preset = ENEMY_MOTION_PRESETS[motionCue]
+      let cancelled = false
+      controls.start(preset).then(() => {
+        if (cancelled || motionCue === 'enemy-defeat') return
+        controls.start(ENEMY_MOTION_PRESETS.idle)
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    controls.start(ENEMY_MOTION_PRESETS.idle)
+    return undefined
+  }, [motionCue, reduceMotion, controls, enemyId])
+
+  return (
+    <motion.div
+      className={`combat-enemy-portrait combat-enemy-image-portrait ${className}`}
+      aria-hidden="true"
+      style={{ transformOrigin: 'bottom center' }}
+      animate={reduceMotion ? false : controls}
+    >
+      <img src={imageSrc} alt="" draggable={false} />
+    </motion.div>
+  )
+}
+
+function BodyClassIcon({ classId, size = 'card', className = '' }) {
+  const imageSrc = getCharacterImageSrc(classId)
+
+  if (imageSrc) {
+    return (
+      <span
+        className={`body-class-icon body-class-image-icon body-class-icon-${size} ${className}`}
+        aria-hidden="true"
+      >
+        <img src={imageSrc} alt="" draggable={false} />
+      </span>
+    )
+  }
+
+  const fallbackSize = size === 'hud' ? 20 : size === 'modal' ? 32 : 24
+
+  return (
+    <span className={`body-class-icon body-class-fallback-icon body-class-icon-${size} ${className}`} aria-hidden="true">
+      <Ghost size={fallbackSize} />
+    </span>
   )
 }
 
@@ -402,13 +514,15 @@ function ExplorationScreen({ frameRef, narrative, isVisible, storyRef, onChoice,
 /* ── Combat ── */
 
 function filterCombatLogLines(lines = []) {
-  return lines.filter(
-    (line) =>
-      line &&
-      !line.startsWith('당신: HP') &&
-      !line.includes('적의 다음 행동:') &&
-      !/:\s*HP \d/.test(line),
-  )
+  return lines.filter((line) => {
+    const text = typeof line === 'string' ? line : normalizeStoryLine(line).text
+    if (!text) return false
+    return (
+      !text.startsWith('당신: HP') &&
+      !text.includes('적의 다음 행동:') &&
+      !/:\s*HP \d/.test(text)
+    )
+  })
 }
 
 const COMBAT_SKILL_ICONS = {
@@ -455,10 +569,12 @@ function CombatScreen({ narrative, isVisible, onChoice, runStatus, hidden }) {
   const playerForSkills = runStatus
     ? {
         attack: runStatus.attack,
+        // runStatus.defense already includes relic bonuses from createRunStatusPayload
         defense: runStatus.defense,
         mp: runStatus.mp,
         maxMp: runStatus.maxMp,
         skills: runStatus.skills,
+        relics: [],
       }
     : null
 
@@ -498,12 +614,27 @@ function CombatScreen({ narrative, isVisible, onChoice, runStatus, hidden }) {
     ? { initial: false, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 12 } }
     : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 20 } }
 
+  const enemyBackgroundClass = getEnemyPortraitBackgroundClass(narrative.backgroundKey)
+  const enemyToneStyle = getEnemyPortraitToneStyle(narrative.backgroundKey)
+  const { enemyMotionCue, screenEffect, isShaking } = useCombatMotion(reduceMotion)
+
+  const screenEffectClass = screenEffect
+    ? `combat-screen-flash combat-screen-flash--${screenEffect}`
+    : ''
+
   return (
-    <aside className={`screen-combat ${hidden}`}>
+    <aside
+      className={`screen-combat ${hidden}${isShaking ? ' is-combat-shaking' : ''}${screenEffect === 'player-attack-strong' ? ' is-combat-impact' : ''}`}
+    >
+      {screenEffect ? <div className={screenEffectClass} aria-hidden="true" /> : null}
       {/* 중앙 상단: 의도(Phaser) + 초상(Phaser) + 이름/HP(React) */}
-      <div className="combat-enemy-stack" aria-label={meta.enemyName}>
+      <div
+        className={`combat-enemy-stack ${enemyBackgroundClass}`}
+        style={enemyToneStyle}
+        aria-label={meta.enemyName}
+      >
         <div className="combat-intent-gap" aria-hidden="true" />
-        <div className="combat-enemy-portrait" aria-hidden="true" />
+        <EnemyPortrait enemyId={meta.enemyId} motionCue={enemyMotionCue} />
         <div className="combat-enemy-info">
           <strong>{meta.enemyName}</strong>
           <small>{meta.enemyKind}</small>
@@ -523,11 +654,14 @@ function CombatScreen({ narrative, isVisible, onChoice, runStatus, hidden }) {
 
       <div className="combat-bottom">
         <div className="combat-log-box game-scroll" ref={combatLogRef}>
-          {logs.map((line, i) => (
-            <p key={`${narrative.id}-log-${i}`} className={i === logs.length - 1 ? 'is-latest' : ''}>
-              {line}
-            </p>
-          ))}
+          {logs.map((line, i) => {
+            const text = typeof line === 'string' ? line : normalizeStoryLine(line).text
+            return (
+              <p key={`${narrative.id}-log-${i}`} className={i === logs.length - 1 ? 'is-latest' : ''}>
+                {text}
+              </p>
+            )
+          })}
         </div>
 
         <GothicPanel className="combat-action-panel">
@@ -900,7 +1034,7 @@ function DeathScreen({ narrative, isVisible, onChoice, hidden }) {
     <aside className={`screen-death ${hidden}`}>
       <div
         className="screen-death-bg"
-        style={{ backgroundImage: `url(${basicBackgroundUrl})` }}
+        style={{ backgroundImage: `url(${deathBackgroundUrl})` }}
         aria-hidden="true"
       />
       <div className="screen-death-vignette" aria-hidden="true" />
@@ -1282,7 +1416,9 @@ function LobbyMain({ narrative, isVisible, onChoice, hidden }) {
         <div className="lobby-body-display">
           <span className="lobby-body-label">현재 깃든 그릇</span>
           <div className="lobby-body-box">
-            <Ghost size={20} className={hasBody ? 'lobby-body-icon' : 'lobby-body-icon is-empty'} />
+            <div className={`lobby-body-avatar ${hasBody ? '' : 'is-empty'}`}>
+              <BodyClassIcon classId={hasBody ? narrative.stats.selectedBodyClassId : null} size="hud" />
+            </div>
             <span className={`lobby-body-box-name ${hasBody ? '' : 'is-empty'}`}>{narrative.stats.selectedBodyName}</span>
           </div>
         </div>
@@ -1312,13 +1448,6 @@ function LobbyMain({ narrative, isVisible, onChoice, hidden }) {
       </motion.div>
     </aside>
   )
-}
-
-const BODY_CLASS_ICONS = {
-  swordsman: '⚔️',
-  monk: '🙏',
-  thief: '🗡️',
-  medium: '🔮',
 }
 
 function BodySelectStatItem({ icon: Icon, value, tone }) {
@@ -1356,8 +1485,6 @@ function BodySelectLobby({ narrative, isVisible, onChoice, hidden }) {
         {bodyOptions.map((option, index) => {
           const selected = narrative.selectedBodyId === option.body.id
           const stats = option.body.stats
-          const icon = BODY_CLASS_ICONS[option.body.classId] ?? '👤'
-
           return (
             <motion.div
               key={option.id}
@@ -1378,9 +1505,7 @@ function BodySelectLobby({ narrative, isVisible, onChoice, hidden }) {
             >
               <div className="body-card-new-header">
                 <div className="body-card-new-main">
-                  <span className="body-card-new-icon" aria-hidden="true">
-                    {icon}
-                  </span>
+                  <BodyClassIcon classId={option.body.classId} className="body-card-new-icon" />
                   <div className="body-card-new-copy">
                     <h3 className={`body-card-new-name ${selected ? 'is-selected' : ''}`}>{option.body.name}</h3>
                     <p className="body-card-new-desc">{option.body.description}</p>
@@ -1626,7 +1751,7 @@ function CharacterInfoModal({ container, status, onClose }) {
         <div className="char-modal-body game-scroll">
           <div className="char-modal-identity">
             <div className="char-modal-avatar">
-              <Ghost size={32} />
+              <BodyClassIcon classId={status.bodyClassId} size="modal" />
             </div>
             <div className="char-modal-info">
               <h3 className="char-modal-name">{status.bodyName}</h3>

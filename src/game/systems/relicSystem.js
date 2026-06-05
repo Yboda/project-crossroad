@@ -5,7 +5,18 @@ export function getRelicById(id) {
 }
 
 export function hasRelic(player, id) {
-  return player.relics.includes(id)
+  return (player?.relics ?? []).includes(id)
+}
+
+export function getDefenseBonus(player) {
+  let bonus = 0
+  if (hasRelic(player, 'old-shield')) bonus += 1
+  if (hasRelic(player, 'old-armor')) bonus += 1
+  return bonus
+}
+
+export function getEffectiveDefense(player) {
+  return player.defense + getDefenseBonus(player)
 }
 
 export function getAttackBonus(player, enemy) {
@@ -25,7 +36,7 @@ export function getAttackBonus(player, enemy) {
 export function applyDefendRelics(player) {
   const messages = []
 
-  if (hasRelic(player, 'old-shield-fragment') || hasRelic(player, 'mirror-fragment')) {
+  if (hasRelic(player, 'broken-shield-fragment') || hasRelic(player, 'mirror-fragment')) {
     player.mp = Math.min(player.maxMp, player.mp + 1)
     const source = hasRelic(player, 'mirror-fragment') ? '감옥 거울 조각' : '낡은 방패 파편'
     messages.push(`${source}이 반응해 MP를 1 회복했다.`)

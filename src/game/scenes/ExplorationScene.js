@@ -11,6 +11,11 @@ import {
   getSkillActions,
 } from '../systems/combatSystem'
 import {
+  emitCombatMotion,
+  getMotionForEnemyIntent,
+  getMotionForPlayerAction,
+} from '../systems/combatMotionSystem'
+import {
   applyEventResult,
   applyRest,
   createEventDialogueNarrative,
@@ -54,7 +59,7 @@ import {
 } from '../systems/shopSystem'
 import { applyDevPreview, exitDevPreview } from '../dev/devPreview'
 import { createRoomOptions } from '../systems/roomGenerator'
-import { getRelicById } from '../systems/relicSystem'
+import { getEffectiveDefense, getRelicById } from '../systems/relicSystem'
 import {
   checkCoreRouteUnlocked,
   createFakeEndingNarrative,
@@ -73,9 +78,9 @@ const LAYOUT = {
 /** React 전투 UI 오버레이와 맞춘 적/의도 표시 위치 (게임 좌표 = 390×844) */
 const COMBAT_LAYOUT = {
   portraitX: GAME_WIDTH / 2,
-  portraitY: 200,
+  portraitY: 560,
   portraitScale: 0.62,
-  intentOffsetY: 76,
+  intentOffsetY: 421,
   /** 1인칭 시점 — 플레이어 피격 연출 위치 (화면 하단 중앙) */
   playerHitX: GAME_WIDTH / 2,
   playerHitY: 498,
@@ -283,6 +288,7 @@ export class ExplorationScene extends Phaser.Scene {
   createRunStatusPayload() {
     return {
       bodyName: this.runState.currentBody?.name ?? '육체 미선택',
+      bodyClassId: this.runState.currentBody?.classId ?? null,
       bodyDescription: this.runState.currentBody?.description ?? '',
       floorName: this.currentFloor.name,
       floorNumber: this.currentFloor.floorNumber ?? this.runState.floorIndex + 1,
@@ -294,7 +300,7 @@ export class ExplorationScene extends Phaser.Scene {
       mp: this.player.mp,
       maxMp: this.player.maxMp,
       attack: this.player.attack,
-      defense: this.player.defense,
+      defense: getEffectiveDefense(this.player),
       block: this.player.block,
       skills: [...(this.player.skills ?? ['heavy', 'mana-guard'])],
       gold: this.runState.gold,
@@ -520,8 +526,10 @@ export class ExplorationScene extends Phaser.Scene {
         actionsLocked: !includeOptions,
       },
     }
-    this.updateIntentIndicator(intent)
+    this.isTransitioning = false
+    this.setUiVisibility(true)
     this.publishNarrative()
+    this.updateIntentIndicator(intent)
   }
 
   createBattleNarrative(log = null) {
@@ -529,7 +537,6 @@ export class ExplorationScene extends Phaser.Scene {
       this.setCombatLog(log)
     }
     const intent = getEnemyIntent(this.currentEnemy)
-    this.updateIntentIndicator(intent)
 
     return {
       id: `battle-${this.depth}-${this.currentEnemy.turn}-${this.player.hp}-${this.currentEnemy.hp}-${this.combatLog?.length ?? 0}`,
@@ -544,6 +551,7 @@ export class ExplorationScene extends Phaser.Scene {
 
   createCombatMeta(intent = getEnemyIntent(this.currentEnemy)) {
     return {
+      enemyId: this.currentEnemy?.id ?? null,
       enemyName: this.currentEnemy?.name ?? '적',
       enemyKind: this.currentEnemy?.tags?.[0] ?? '적',
       enemyHp: this.currentEnemy?.hp ?? 0,
@@ -598,8 +606,9 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   updateIntentIndicator(intent = getEnemyIntent(this.currentEnemy)) {
-    if (!this.currentEnemy || !this.enemySprite.visible) {
-      this.intentIndicator.setVisible(false)
+    const inCombat = this.currentNarrative?.layout === 'combat'
+    if (!this.currentEnemy || !intent?.type || (!inCombat && !this.enemySprite.visible)) {
+      this.intentIndicator?.setVisible(false)
       return
     }
 
@@ -653,15 +662,15 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   syncEnemyAttachedUi() {
-    if (!this.enemySprite?.visible) {
-      return
-    }
-
-    if (this.currentNarrative?.layout === 'combat') {
+    if (this.currentNarrative?.layout === 'combat' && this.currentEnemy) {
       this.intentIndicator.setPosition(
         COMBAT_LAYOUT.portraitX,
         COMBAT_LAYOUT.portraitY - COMBAT_LAYOUT.intentOffsetY,
       )
+      return
+    }
+
+    if (!this.enemySprite?.visible) {
       return
     }
 
@@ -680,9 +689,9 @@ export class ExplorationScene extends Phaser.Scene {
     const inCombat = this.currentNarrative?.layout === 'combat' && Boolean(this.currentEnemy)
 
     if (inCombat) {
-      this.enemySprite.setVisible(true)
-      this.enemyBattleHud.setVisible(false)
       this.applyCombatEnemyLayout()
+      this.enemySprite.setVisible(false)
+      this.enemyBattleHud.setVisible(false)
       this.updateIntentIndicator()
       return
     }
@@ -888,7 +897,11 @@ export class ExplorationScene extends Phaser.Scene {
 
   publishNarrative() {
     this.syncLobbyBackground()
-    this.syncCombatPresentation()
+    try {
+      this.syncCombatPresentation()
+    } catch (error) {
+      console.error('[publishNarrative] syncCombatPresentation failed', error)
+    }
     let narrative = { ...this.currentNarrative }
     if (narrative.layout === 'combat' && this.currentEnemy) {
       narrative = {
@@ -936,13 +949,19 @@ export class ExplorationScene extends Phaser.Scene {
     })
   }
 
-  animatePlayerAttack() {
+  animatePlayerAttack(actionId, result) {
     const inCombat = this.currentNarrative?.layout === 'combat'
+
+    if (inCombat && result) {
+      const motion = getMotionForPlayerAction(actionId, result)
+      emitCombatMotion({ source: 'player', actionId, ...motion })
+      return
+    }
 
     this.tweens.add({
       targets: this.enemySprite,
-      x: inCombat ? this.enemySprite.x : this.enemySprite.x + 10,
-      y: inCombat ? this.enemySprite.y - 16 : this.enemySprite.y,
+      x: this.enemySprite.x + 10,
+      y: this.enemySprite.y,
       alpha: 0.72,
       duration: 90,
       yoyo: true,
@@ -972,28 +991,31 @@ export class ExplorationScene extends Phaser.Scene {
     })
   }
 
-  animateEnemyAction(result) {
+  animateEnemyAction(result, intentType) {
+    const inCombat = this.currentNarrative?.layout === 'combat'
+
+    if (inCombat && intentType) {
+      const motion = getMotionForEnemyIntent(intentType, result)
+      emitCombatMotion({ source: 'enemy', intentType, ...motion })
+      return
+    }
+
     if (result.target === 'player') {
-      const inCombat = this.currentNarrative?.layout === 'combat'
       const startX = this.enemySprite.x
       const startY = this.enemySprite.y
-      const baseScale = COMBAT_LAYOUT.portraitScale
 
       this.tweens.add({
         targets: this.enemySprite,
-        x: inCombat ? startX : startX - 20,
-        y: inCombat ? startY + COMBAT_LAYOUT.lungeDy : startY,
-        scaleX: inCombat ? baseScale * 1.08 : this.enemySprite.scaleX,
-        scaleY: inCombat ? baseScale * 1.08 : this.enemySprite.scaleY,
+        x: startX - 20,
+        y: startY,
+        scaleX: this.enemySprite.scaleX * 1.08,
+        scaleY: this.enemySprite.scaleY * 1.08,
         duration: 130,
         yoyo: true,
         ease: 'Sine.easeInOut',
       })
 
-      if (inCombat) {
-        this.flashCombatPlayerHit()
-      }
-
+      this.flashCombatPlayerHit()
       return
     }
 
@@ -1022,8 +1044,8 @@ export class ExplorationScene extends Phaser.Scene {
       floatX = COMBAT_LAYOUT.playerHitX
       floatY = COMBAT_LAYOUT.playerHitY
     } else if (result.target === 'enemy') {
-      floatX = this.enemySprite.x
-      floatY = this.enemySprite.y - 100
+      floatX = inCombat ? COMBAT_LAYOUT.portraitX : this.enemySprite.x
+      floatY = inCombat ? COMBAT_LAYOUT.portraitY - 100 : this.enemySprite.y - 100
     } else {
       floatX = COMBAT_LAYOUT.playerHitX
       floatY = COMBAT_LAYOUT.playerHitY
@@ -1054,11 +1076,22 @@ export class ExplorationScene extends Phaser.Scene {
   }
 
   animateEnemyDefeat() {
+    const inCombat = this.currentNarrative?.layout === 'combat'
+
+    if (inCombat) {
+      emitCombatMotion({ source: 'enemy', enemy: 'enemy-defeat', screen: null })
+    }
+
     this.tweens.killTweensOf(this.enemySprite)
     this.tweens.killTweensOf(this.intentIndicator)
     this.tweens.killTweensOf(this.enemyBattleHud)
     this.intentIndicator.setVisible(false)
     this.enemyBattleHud.setVisible(false)
+
+    if (inCombat) {
+      return
+    }
+
     this.tweens.add({
       targets: this.enemySprite,
       alpha: 0,
@@ -1129,6 +1162,7 @@ export class ExplorationScene extends Phaser.Scene {
 
     if (option.type === 'back-to-lobby') {
       this.currentNarrative = createLobbyNarrative(this.runState, this.persistentState)
+      this.updateHud()
       this.publishNarrative()
       return
     }
@@ -1524,9 +1558,10 @@ export class ExplorationScene extends Phaser.Scene {
     this.publishCombatNarrative({ includeOptions: false })
 
     this.time.delayedCall(700, () => {
+      const ambushIntent = getEnemyIntent(this.currentEnemy)
       const enemyResult = applyEnemyIntent(this.player, this.currentEnemy)
       this.appendCombatLog(enemyResult.message)
-      this.animateEnemyAction(enemyResult)
+      this.animateEnemyAction(enemyResult, ambushIntent.type)
       this.showCombatFloat(enemyResult)
       this.updateHud()
       this.publishCombatNarrative({ includeOptions: false })
@@ -1552,7 +1587,7 @@ export class ExplorationScene extends Phaser.Scene {
 
     const playerResult = applyPlayerAction(this.player, this.currentEnemy, actionId)
     this.appendCombatLog(playerResult.message)
-    this.animatePlayerAttack()
+    this.animatePlayerAttack(actionId, playerResult)
     this.showCombatFloat(playerResult)
     this.updateHud()
     this.publishCombatNarrative({ includeOptions: false })
@@ -1588,9 +1623,10 @@ export class ExplorationScene extends Phaser.Scene {
         return
       }
 
+      const enemyIntent = getEnemyIntent(this.currentEnemy)
       const enemyResult = applyEnemyIntent(this.player, this.currentEnemy)
       this.appendCombatLog(enemyResult.message)
-      this.animateEnemyAction(enemyResult)
+      this.animateEnemyAction(enemyResult, enemyIntent.type)
       this.showCombatFloat(enemyResult)
       this.updateHud()
       this.publishCombatNarrative({ includeOptions: false })

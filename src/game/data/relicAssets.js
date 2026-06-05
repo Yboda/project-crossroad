@@ -5,9 +5,12 @@ import brokenClockPng from '../../assets/relics/broken-clock.png'
 import glassEyePng from '../../assets/relics/glass-eye.png'
 import hardBreadPng from '../../assets/relics/hard-bread.png'
 import merchantMarkPng from '../../assets/relics/merchant-mark.png'
-import oldShieldFragmentPng from '../../assets/relics/old-shield-fragment.png'
+import namelessPrayerPng from '../../assets/relics/nameless-prayer.png'
+import oldArmorPng from '../../assets/relics/old-armor.png'
+import oldShieldFragmentPng from '../../assets/relics/broken-shield-fragment.png'
+import oldShieldPng from '../../assets/relics/old-shield.png'
 import rustedKeyPng from '../../assets/relics/rusted-key.png'
-import sealedNamePng from '../../assets/relics/sealed-name.png'
+import sealedMemoryPng from '../../assets/relics/sealed-memory.png'
 import warmEmberPng from '../../assets/relics/warm-ember.png'
 import wardensMarkPng from '../../assets/relics/wardens-mark.png'
 
@@ -20,9 +23,12 @@ export const RELIC_IMAGE_SOURCES = {
   'glass-eye': glassEyePng,
   'hard-bread': hardBreadPng,
   'merchant-mark': merchantMarkPng,
-  'old-shield-fragment': oldShieldFragmentPng,
+  'nameless-prayer': namelessPrayerPng,
+  'old-armor': oldArmorPng,
+  'broken-shield-fragment': oldShieldFragmentPng,
+  'old-shield': oldShieldPng,
   'rusted-key': rustedKeyPng,
-  'sealed-name': sealedNamePng,
+  'sealed-name': sealedMemoryPng,
   'warm-ember': warmEmberPng,
   'wardens-mark': wardensMarkPng,
 }

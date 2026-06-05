@@ -1,7 +1,7 @@
 export const enemyTemplates = {
-  'cave-wolf': {
-    id: 'cave-wolf',
-    name: '동굴 늑대',
+  'starving-wolf': {
+    id: 'starving-wolf',
+    name: '굶주린 늑대',
     textureKey: 'enemy-wolf',
     maxHp: 24,
     attack: 6,
@@ -51,16 +51,16 @@ export const enemyTemplates = {
     ],
     rewards: { gold: [12, 18], memoryShards: [1, 2] },
   },
-  'mirror-moth': {
-    id: 'mirror-moth',
-    name: '거울나방',
-    textureKey: 'enemy-moth',
+  'ghost-of-regret': {
+    id: 'ghost-of-regret',
+    name: '후회의 망령',
+    textureKey: 'enemy-regret',
     maxHp: 28,
     attack: 7,
     pattern: [
-      { type: 'buff', value: 2, label: '빛 반사' },
-      { type: 'attack', value: 8, label: '유리 가루' },
-      { type: 'attack', value: 9, label: '눈부신 날개' },
+      { type: 'buff', value: 2, label: '원한 증폭' },
+      { type: 'attack', value: 8, label: '저주의 주문' },
+      { type: 'attack', value: 10, label: '죽음 영창' },
     ],
     rewards: { gold: [11, 17], memoryShards: [1, 2] },
   },
@@ -77,15 +77,15 @@ export const enemyTemplates = {
     ],
     rewards: { gold: [10, 18], memoryShards: [1, 2] },
   },
-  'sunless-knight': {
-    id: 'sunless-knight',
-    name: '해 없는 기사',
+  'dark-knight': {
+    id: 'dark-knight',
+    name: '검은 기사',
     textureKey: 'enemy-knight',
     maxHp: 42,
     attack: 10,
     pattern: [
       { type: 'block', value: 10, label: '무광의 방패' },
-      { type: 'attack', value: 11, label: '빛 없는 검격' },
+      { type: 'attack', value: 11, label: '어두운 검격' },
       { type: 'attack', value: 13, label: '처형 자세' },
     ],
     rewards: { gold: [18, 26], memoryShards: [2, 3] },
@@ -103,14 +103,14 @@ export const enemyTemplates = {
     ],
     rewards: { gold: [16, 24], memoryShards: [2, 3] },
   },
-  'gate-hound': {
-    id: 'gate-hound',
-    name: '문틈 사냥개',
+  'soul-hound': {
+    id: 'soul-hound',
+    name: '영혼 사냥개',
     textureKey: 'enemy-hound',
     maxHp: 38,
     attack: 10,
     pattern: [
-      { type: 'attack', value: 10, label: '문틈 돌진' },
+      { type: 'attack', value: 10, label: '영혼 돌진' },
       { type: 'attack', value: 12, label: '목덜미 물기' },
       { type: 'block', value: 9, label: '균열 속 숨기' },
     ],
@@ -141,7 +141,7 @@ export const bossTemplates = {
     pattern: [
       { type: 'attack', value: 10, label: '무더기 내려찍기' },
       { type: 'block', value: 10, label: '시체 방패' },
-      { type: 'buff', value: 2, label: '도살자의 숨' },
+      { type: 'buff', value: 3, label: '도살자의 숨' },
     ],
     rewards: { gold: [28, 36], memoryShards: [3, 5] },
     memoryId: 'boss-corpse-butcher',
@@ -180,7 +180,7 @@ export function createEnemy(depthOrContext) {
   const context = typeof depthOrContext === 'number' ? { totalDepth: depthOrContext } : depthOrContext
   const pool = context.enemyPool ?? Object.keys(enemyTemplates)
   const enemyId = context.enemyId ?? pool[Math.floor(Math.random() * pool.length)]
-  const template = enemyTemplates[enemyId] ?? enemyTemplates['cave-wolf']
+  const template = enemyTemplates[enemyId] ?? enemyTemplates['starving-wolf']
   const hpBonus = Math.floor((context.totalDepth ?? 1) * 1.5) + (context.difficulty?.hp ?? 0)
 
   return {

@@ -43,7 +43,7 @@ export const rewardTable = [
   },
   {
     type: 'relic',
-    value: 'old-shield-fragment',
+    value: 'broken-shield-fragment',
     label: '유물: 낡은 방패 파편',
     detail: '전장의 잔해에서 방패 파편을 집어 든다.',
   },

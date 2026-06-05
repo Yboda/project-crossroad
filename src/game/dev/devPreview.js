@@ -253,7 +253,7 @@ function ensureDevRunActive(scene) {
 
 function createDevEnemy(scene) {
   return createEnemy({
-    enemyId: 'cave-wolf',
+    enemyId: 'starving-wolf',
     totalDepth: scene.runState.totalDepth,
     difficulty: scene.currentFloor?.difficulty ?? { hp: 0, attack: 0 },
   })

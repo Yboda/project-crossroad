@@ -26,7 +26,7 @@ export const floorMerchants = {
     id: 'merchant-2f',
     title: '메아리의 상인',
     label: '메아리의 상인',
-    backgroundKey: 'background-basic',
+    backgroundKey: 'background-1f-path',
     entryStory: [
       '감옥 벽 사이 좁은 틈에 상인이 앉아 있다. 후드 속에서는 누군가의 메아리만 되살아난다.',
       '지금 당신의 골드는 {gold}이다. 쇠사슬 소리와 함께 가격표가 흔들린다.',
@@ -45,7 +45,7 @@ export const floorMerchants = {
     id: 'merchant-3f',
     title: '문지기의 상인',
     label: '문지기의 상인',
-    backgroundKey: 'background-basic',
+    backgroundKey: 'background-1f-path',
     entryStory: [
       '하늘문 아래 서 있는 상인은 그림자가 없다. 후드 속 얼굴도, 발밑 그림자도 비어 있다.',
       '지금 당신의 골드는 {gold}이다. 문지기의 표식이 새겨진 물건들이 가격을 기다린다.',
