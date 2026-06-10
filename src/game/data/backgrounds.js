@@ -1,11 +1,14 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../constants'
-import path1fBackgroundUrl from '../../assets/backgrounds/test3.png'
+import path1fBackgroundUrl from '../../assets/backgrounds/1f-battle.jpg'
 import deathBackgroundUrl from '../../assets/backgrounds/death.jpg'
 import lobbyBackgroundUrl from '../../assets/backgrounds/lobby-1.png'
-import boss1FrontBackgroundUrl from '../../assets/backgrounds/1f-front-of-boss-room.png'
-import merchant1fBackgroundUrl from '../../assets/backgrounds/1f-merchant.jpg'
+import boss1FrontBackgroundUrl from '../../assets/backgrounds/1f-boss-door.jpg'
+import merchant1fBackgroundUrl from '../../assets/backgrounds/1f-merchant.png'
 import corpsePit1fBackgroundUrl from '../../assets/backgrounds/1f-corpse-pit.png'
 import insideCorpsePit1fBackgroundUrl from '../../assets/backgrounds/1f-inside-the-corpse-pit.png'
+import blacksmith1fBackgroundUrl from '../../assets/backgrounds/1f-blacksmith.jpg'
+import watchfireBackgroundUrl from '../../assets/backgrounds/watchfire.jpg'
+import watchfire2BackgroundUrl from '../../assets/backgrounds/watchfire2.png'
 
 /**
  * Phaser 배경 텍스처 정의.
@@ -105,6 +108,54 @@ export const BACKGROUND_TEXTURES = {
       vignetteMid: 0.17,
       fadeStart: 94,
       fadeEnd: 99,
+    },
+  },
+  'background-1f-blacksmith': {
+    url: blacksmith1fBackgroundUrl,
+    explorationTone: {
+      dimAlpha: 0.24,
+    },
+    enemyPortraitTone: {
+      brightness: 0.9,
+      contrast: 1.06,
+      saturate: 0.72,
+      sepia: 0.14,
+      vignetteInner: 0.4,
+      vignetteMid: 0.15,
+      fadeStart: 95,
+      fadeEnd: 99.5,
+    },
+  },
+  'background-watchfire': {
+    url: watchfireBackgroundUrl,
+    explorationTone: {
+      dimAlpha: 0.2,
+    },
+    enemyPortraitTone: {
+      brightness: 0.92,
+      contrast: 1.04,
+      saturate: 0.78,
+      sepia: 0.1,
+      vignetteInner: 0.36,
+      vignetteMid: 0.12,
+      fadeStart: 96,
+      fadeEnd: 99.5,
+    },
+  },
+  'background-1f-watchfire2': {
+    url: watchfire2BackgroundUrl,
+    explorationTone: {
+      dimAlpha: 0.2,
+    },
+    enemyPortraitTone: {
+      brightness: 0.92,
+      contrast: 1.04,
+      saturate: 0.78,
+      sepia: 0.1,
+      vignetteInner: 0.36,
+      vignetteMid: 0.12,
+      fadeStart: 96,
+      fadeEnd: 99.5,
     },
   },
 }

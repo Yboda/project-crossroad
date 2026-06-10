@@ -17,6 +17,8 @@ export const DEV_SCREEN_GROUPS = [
       { id: 'exploration-battle-intro', label: '전투 직전' },
       { id: 'exploration-rest', label: '휴식처' },
       { id: 'exploration-event', label: '이벤트 (제단)' },
+      { id: 'exploration-event-blacksmith', label: '이벤트 (대장장이)' },
+      { id: 'exploration-event-campfire', label: '이벤트 (모닥불)' },
       { id: 'exploration-relic-modal', label: '탐험 + 유물 모달' },
     ],
   },

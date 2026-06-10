@@ -42,7 +42,7 @@ export const roomTypes = {
   rest: {
     id: 'rest',
     label: '희미한 모닥불',
-    backgroundKey: 'background-1f-path',
+    backgroundKey: 'background-watchfire',
     risk: '안전',
     story: [
       '꺼져가는 모닥불이 동굴 벽에 긴 그림자를 만든다. 누가 남기고 간 담요와 빈 냄비가 놓여 있다.',

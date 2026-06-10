@@ -82,10 +82,15 @@ export function applyDevPreview(scene, screenId, options = {}) {
       break
 
     case 'exploration-event':
-      ensureDevRunActive(scene)
-      scene.currentRoom = { ...roomTypes.event, instanceId: 'dev-event', type: 'event', eventId: 'old-altar' }
-      scene.currentEnemy = null
-      scene.currentNarrative = createEventNarrative('old-altar', scene.player)
+      applyDevEventPreview(scene, 'old-altar')
+      break
+
+    case 'exploration-event-blacksmith':
+      applyDevEventPreview(scene, 'blacksmith-soul')
+      break
+
+    case 'exploration-event-campfire':
+      applyDevEventPreview(scene, 'endless-campfire')
       break
 
     case 'exploration-relic-modal':
@@ -193,6 +198,19 @@ export function exitDevPreview(scene) {
   scene.publishNarrative()
   scene.updateHud()
   window.dispatchEvent(new CustomEvent('game:dev-preview-state', { detail: { active: false } }))
+}
+
+function applyDevEventPreview(scene, eventId) {
+  ensureDevRunActive(scene)
+  scene.currentRoom = {
+    ...roomTypes.event,
+    instanceId: `dev-event-${eventId}`,
+    type: 'event',
+    eventId,
+  }
+  scene.currentEnemy = null
+  scene.applyEventRoomBackground(eventId)
+  scene.currentNarrative = createEventNarrative(eventId, scene.player)
 }
 
 function ensureDevRunActive(scene) {

@@ -6,6 +6,7 @@ export const floors = [
     depthToBoss: 4,
     backgroundKey: 'background-1f-path',
     bossIntroBackgroundKey: 'background-boss-1f-front',
+    restBackgroundKey: 'background-1f-watchfire2',
     enemyPool: ['starving-wolf', 'ash-imp', 'bone-rat'],
     bossId: 'corpse-butcher',
     eventPool: ['old-altar', 'hand-in-corpses', 'backward-well', 'blacksmith-soul', '1f-corpse-pit', 'black-thorn-wall'],

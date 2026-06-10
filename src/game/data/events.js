@@ -132,21 +132,9 @@ export const events = [
     ],
   },
   {
-    id: 'hand-in-corpses',
-    title: '시체더미 속 손',
-    story: [
-      '쌓인 시체 사이에서 아직 따뜻한 손 하나가 당신의 발목을 붙든다. 심장 박동이 느리게 전해진다.',
-      '끌어올리면 무언가를 얻을지, 끊고 지나가면 기억만 남을지—선택은 당신의 손에 달려 있다.',
-    ],
-    options: [
-      { id: 'pull', label: '손을 끌어올린다.', detail: '피해를 받고 골드를 얻는다.', result: { hp: -4, gold: 18 } },
-      { id: 'listen', label: '그 손의 기억을 듣는다.', detail: '영혼의 흔적을 얻는다.', result: { memoryShards: 2 } },
-      { id: 'cut', label: '손을 끊고 지나간다.', detail: '전투 기습 가능성이 생긴다.', result: { stealth: true } },
-    ],
-  },
-  {
     id: 'blacksmith-soul',
     title: '대장장이의 영혼',
+    backgroundKey: 'background-1f-blacksmith',
     story: [
       '망치질 소리가 끊이지 않는 통로 끝에, 희미한 영혼이 서 있다. 그의 손에는 아직 힘이 남아 있는 것 같다.',
       '"잠깐만 몸을 빌려다오. 내 힘이 아직 강해. 네가 허락하면, 네게 도움을 줄 수 있다."',
@@ -203,19 +191,6 @@ export const events = [
     ],
   },
   {
-    id: 'backward-well',
-    title: '거꾸로 흐르는 우물',
-    story: [
-      '우물 속 물방울이 아래에서 위로 떨어진다. 수면에는 모르는 얼굴이 희미하게 비친다.',
-      '마시면 회복할지, 골드를 던지면 다른 대가를 받을지—우물은 답을 강요하지 않는다.',
-    ],
-    options: [
-      { id: 'drink', label: '물을 마신다.', detail: 'HP와 MP를 회복한다.', result: { hp: 8, mp: 2 } },
-      { id: 'drop-gold', label: '골드를 던진다.', detail: '골드 10 소모, 영혼의 흔적 획득.', result: { gold: -10, memoryShards: 3 } },
-      { id: 'ignore', label: '눈을 돌린다.', detail: '아무 일도 일어나지 않는다.', result: {} },
-    ],
-  },
-  {
     id: 'memory-door',
     title: '기억을 묻는 문',
     story: [
@@ -231,6 +206,7 @@ export const events = [
   {
     id: 'endless-campfire',
     title: '꺼지지 않는 모닥불',
+    backgroundKey: 'background-watchfire',
     story: [
       '모닥불 주변에는 여러 명이 앉아 있었던 자국이 있다. 모두 당신의 체온과 닮아 있다.',
       '불꽃은 꺼지지 않는다. 마치 누군가가 영원히 돌아오기를 기다리는 것처럼.',

@@ -1,4 +1,4 @@
-.app-shell {
+﻿.app-shell {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1380,10 +1380,10 @@
 }
 
 /* ===================================
-   MOCKUP DESIGN SYSTEM — NEW STYLES
+   MOCKUP DESIGN SYSTEM ??NEW STYLES
    =================================== */
 
-/* ── StatBar ── */
+/* ?? StatBar ?? */
 .m-stat-bg {
   width: 100%;
   height: 6px;
@@ -1405,7 +1405,7 @@
   box-shadow: 0 0 5px rgba(30, 64, 175, 0.5);
 }
 
-/* ── GothicButton ── */
+/* ?? GothicButton ?? */
 .gothic-btn {
   display: flex;
   align-items: center;
@@ -1526,7 +1526,7 @@
   opacity: 0.7;
 }
 
-/* ── TopHUD (ui-proto hud.tsx) ── */
+/* ?? TopHUD (ui-proto hud.tsx) ?? */
 .top-hud {
   position: absolute;
   top: 0;
@@ -1664,7 +1664,7 @@
 }
 .top-hud-resource.gold { color: #a1a1aa; }
 
-/* ── Lobby ── */
+/* ?? Lobby ?? */
 .lobby-screen-new {
   position: absolute;
   inset: 0;
@@ -1946,7 +1946,7 @@
   padding-bottom: 16px;
 }
 
-/* ── Body Select (ui-proto) ── */
+/* ?? Body Select (ui-proto) ?? */
 .body-select-screen-new {
   position: absolute;
   inset: 0;
@@ -2193,7 +2193,7 @@
   background: #27272a;
 }
 
-/* ── Story Panel (exploration) redesign ── */
+/* ?? Story Panel (exploration) redesign ?? */
 .story-panel-exploration {
   border-left: 2px solid #8a6b32;
   border-right: 0;
@@ -2221,7 +2221,7 @@
 }
 .story-copy-new p:last-child { color: #71717a; }
 
-/* ── Choice buttons (GothicButton style) ── */
+/* ?? Choice buttons (GothicButton style) ?? */
 .choice-button-new {
   width: 100%;
   padding: 14px 16px;
@@ -2269,7 +2269,7 @@
 }
 .choice-button-new:disabled small { color: #52525b; }
 
-/* ── Shop choice buttons (ghost style) ── */
+/* ?? Shop choice buttons (ghost style) ?? */
 .choice-button-ghost {
   background: transparent;
   border: 0;
@@ -2278,7 +2278,7 @@
 .choice-button-ghost:hover { color: #c2a67a; background: transparent; }
 .choice-button-ghost:disabled { opacity: 0.4; }
 
-/* ── Character info modal redesign ── */
+/* ?? Character info modal redesign ?? */
 .char-modal-new {
   position: relative;
   width: min(calc(100% - 18px), 372px);
@@ -2499,7 +2499,7 @@
   padding: 16px;
 }
 
-/* ── Relic acquired modal (ui-proto) ── */
+/* ?? Relic acquired modal (ui-proto) ?? */
 .relic-modal-new {
   position: relative;
   width: min(calc(100% - 32px), 384px);
@@ -2639,7 +2639,7 @@
   background: #27272a;
 }
 
-/* ── Level up modal redesign ── */
+/* ?? Level up modal redesign ?? */
 .levelup-modal-new {
   position: relative;
   width: min(calc(100% - 24px), 340px);
@@ -2696,7 +2696,7 @@
   margin-bottom: 0;
 }
 
-/* ── Exploration screen new panel ── */
+/* ?? Exploration screen new panel ?? */
 .exploration-story-panel {
   position: absolute;
   left: 0;
@@ -2804,7 +2804,7 @@
   margin-bottom: 4px;
 }
 
-/* ── Gothic panel (mockup) ── */
+/* ?? Gothic panel (mockup) ?? */
 .gothic-panel {
   background: rgba(18, 18, 21, 0.9);
   backdrop-filter: blur(12px);
@@ -2822,7 +2822,7 @@
   gap: 8px;
 }
 
-/* ── Full-screen overlay base ── */
+/* ?? Full-screen overlay base ?? */
 .lobby-screen-new,
 .body-select-screen-new,
 .soul-screen-new,
@@ -2859,7 +2859,7 @@
   transform: translateY(14px);
 }
 
-/* ── Exploration in-run ── */
+/* ?? Exploration in-run ?? */
 .screen-exploration {
   justify-content: flex-end;
   pointer-events: none;
@@ -2879,7 +2879,7 @@
   flex: 0 0 auto;
 }
 
-/* ── Combat ── */
+/* ?? Combat ?? */
 .screen-combat {
   display: flex;
   flex-direction: column;
@@ -2979,7 +2979,7 @@
   }
 }
 
-/* 중앙 상단 적 스택 — 의도는 Phaser, 초상은 React 이미지 */
+/* 以묒븰 ?곷떒 ???ㅽ깮 ???섎룄??Phaser, 珥덉긽? React ?대?吏 */
 .combat-enemy-stack {
   position: absolute;
   top: 180px;
@@ -2995,7 +2995,7 @@
   z-index: 1;
 }
 
-/* 몬스터 영역 뒤 대기감 비네트 */
+/* 紐ъ뒪???곸뿭 ???湲곌컧 鍮꾨꽕??*/
 .combat-enemy-stack::before {
   content: '';
   position: absolute;
@@ -3046,12 +3046,17 @@
 
 .combat-enemy-image-portrait {
   position: relative;
+  isolation: isolate;
+  contain: layout paint;
+  overflow: hidden;
   width: var(--enemy-portrait-width, 292px);
   display: block;
   transform-origin: bottom center;
 }
 
 .combat-enemy-image-portrait img {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: auto;
   display: block;
@@ -3180,7 +3185,7 @@
   z-index: 2;
 }
 
-/* 스킬 선택 오버레이 (ui-proto combat-screen) */
+/* ?ㅽ궗 ?좏깮 ?ㅻ쾭?덉씠 (ui-proto combat-screen) */
 .combat-skill-panel-wrap {
   position: absolute;
   left: 16px;
@@ -3370,7 +3375,7 @@
   color: #60a5fa;
 }
 
-/* 목업 전투 로그 박스 */
+/* 紐⑹뾽 ?꾪닾 濡쒓렇 諛뺤뒪 */
 .combat-log-box {
   width: 100%;
   height: 128px;
@@ -3473,7 +3478,7 @@
   pointer-events: none;
 }
 
-/* ── Victory ── */
+/* ?? Victory ?? */
 .screen-victory {
   align-items: center;
   justify-content: center;
@@ -3870,7 +3875,7 @@
   color: #71717a;
 }
 
-/* ── Death (ui-proto death-screen) ── */
+/* ?? Death (ui-proto death-screen) ?? */
 .screen-death {
   align-items: center;
   justify-content: center;
@@ -4060,7 +4065,7 @@
   border-color: rgba(153, 27, 27, 0.6);
 }
 
-/* ── Level up ── */
+/* ?? Level up ?? */
 .screen-levelup {
   align-items: center;
   justify-content: center;
@@ -4160,7 +4165,7 @@
   color: #71717a;
 }
 
-/* ── Shop entry ── */
+/* ?? Shop entry ?? */
 .screen-shop-entry {
   justify-content: flex-end;
   background: transparent;
@@ -4216,7 +4221,7 @@
   box-sizing: border-box;
 }
 
-/* ── Shop buy ── */
+/* ?? Shop buy ?? */
 .screen-shop-buy {
   justify-content: flex-end;
   background: transparent;
@@ -4462,7 +4467,7 @@
   opacity: 0.4;
 }
 
-/* ── Soul engraving (ui-proto layout; desc area unchanged) ── */
+/* ?? Soul engraving (ui-proto layout; desc area unchanged) ?? */
 .soul-screen-new {
   display: flex;
   flex-direction: column;
@@ -4822,7 +4827,7 @@
   line-height: 1.6;
 }
 
-/* ── Dev tools (DEV only) ── */
+/* ?? Dev tools (DEV only) ?? */
 
 .dev-tools {
   position: fixed;

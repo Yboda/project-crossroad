@@ -656,7 +656,6 @@ function CombatScreen({ narrative, isVisible, onChoice, runStatus, hidden }) {
           <EnemyPortrait enemyId={meta.enemyId} motionCue={enemyMotionCue} />
           <div className="combat-enemy-info">
             <strong>{meta.enemyName}</strong>
-            <small>{meta.enemyKind}</small>
           </div>
           <div className="combat-enemy-hp-block">
             <div className="combat-enemy-hp-row">

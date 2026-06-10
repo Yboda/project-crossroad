@@ -1,5 +1,6 @@
 import ashImpPng from '../../assets/enemies/ash-imp.png'
 import boneRatPng from '../../assets/enemies/bone-rat.png'
+import corpseButcherPng from '../../assets/enemies/corpse-butcher.png'
 import darkKnightPng from '../../assets/enemies/dark-knight.png'
 import soulHoundPng from '../../assets/enemies/soul-hound.png'
 import timeManagerPng from '../../assets/enemies/time-manager.png'
@@ -13,6 +14,7 @@ export const ENEMY_IMAGE_SOURCES = {
   'soul-hound': soulHoundPng,
   'dark-knight': darkKnightPng,
   'time-manager': timeManagerPng,
+  'corpse-butcher': corpseButcherPng,
 }
 
 const DEFAULT_ENEMY_IMAGE = boneRatPng
@@ -49,6 +51,7 @@ export function getEnemyPortraitToneOverrideStyle(enemyId) {
  * - offsetY: 음수면 위, 양수면 아래
  * - offsetX: 음수면 왼쪽, 양수면 오른쪽
  * - width: 기본 292px 대신 개별 너비 (가로로 긴 적 등)
+ * - 하단 페이드 해제: App.css `.combat-enemy-id--{id}`
  */
 export const ENEMY_PORTRAIT_LAYOUT_OVERRIDES = {
   'dark-knight': {
@@ -57,6 +60,10 @@ export const ENEMY_PORTRAIT_LAYOUT_OVERRIDES = {
   },
   'time-manager': {
     offsetY: -80,
+    offsetX: 0,
+  },
+  'corpse-butcher': {
+    offsetY: -130,
     offsetX: 0,
   },
 }

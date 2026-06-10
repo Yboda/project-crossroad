@@ -184,12 +184,32 @@ export class ExplorationScene extends Phaser.Scene {
     }
 
     const textureKey = resolveBackgroundKey(backgroundKey)
-    if (this.textures.exists(textureKey)) {
-      this.background.setTexture(textureKey)
-      this.background.setVisible(true)
-      this.currentBackgroundZoom = coverZoom
-      applyBackgroundCover(this.background, coverZoom)
+
+    if (!this.textures.exists(textureKey)) {
+      const definition = getBackgroundDefinition(textureKey)
+      if (definition?.url) {
+        if (!this._loadingBackgroundKeys) {
+          this._loadingBackgroundKeys = new Set()
+        }
+        if (!this._loadingBackgroundKeys.has(textureKey)) {
+          this._loadingBackgroundKeys.add(textureKey)
+          this.load.image(textureKey, definition.url)
+          this.load.once(`filecomplete-image-${textureKey}`, () => {
+            this._loadingBackgroundKeys.delete(textureKey)
+            this.applySceneBackground(backgroundKey, { lobby, zoom })
+          })
+          if (!this.load.isLoading()) {
+            this.load.start()
+          }
+        }
+      }
+      return
     }
+
+    this.background.setTexture(textureKey)
+    this.background.setVisible(true)
+    this.currentBackgroundZoom = coverZoom
+    applyBackgroundCover(this.background, coverZoom)
 
     const tone = getBackgroundDefinition(textureKey).explorationTone
     const tint = resolveBackgroundTintForScene(textureKey, isDevBackgroundTintEnabled())
@@ -411,6 +431,9 @@ export class ExplorationScene extends Phaser.Scene {
       return
     }
     this.currentRoom = { ...this.currentRoom, backgroundKey }
+    this.applySceneBackground(backgroundKey, {
+      zoom: this.currentBackgroundZoom ?? 1,
+    })
   }
 
   createRoomNarrative(room) {
@@ -575,7 +598,6 @@ export class ExplorationScene extends Phaser.Scene {
     return {
       enemyId: this.currentEnemy?.id ?? null,
       enemyName: this.currentEnemy?.name ?? '적',
-      enemyKind: this.currentEnemy?.tags?.[0] ?? '적',
       enemyHp: this.currentEnemy?.hp ?? 0,
       enemyMaxHp: this.currentEnemy?.maxHp ?? 1,
       enemyBlock: this.currentEnemy?.block ?? 0,
